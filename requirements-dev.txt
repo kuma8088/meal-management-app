@@ -1,0 +1,16 @@
+# Development dependencies
+-r requirements.txt
+
+# Linting and formatting
+black==23.12.0
+flake8==6.1.0
+isort==5.13.2
+pylint==3.0.3
+
+# Testing tools
+pytest-mock==3.12.0
+pytest-asyncio==0.21.1
+faker==20.1.0
+
+# Documentation
+sphinx==7.2.6

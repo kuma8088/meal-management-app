@@ -1,0 +1,17 @@
+# AWS SDK
+boto3==1.34.0
+botocore==1.34.0
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+hypothesis==6.92.0
+moto==4.2.10
+
+# Utilities
+python-dateutil==2.8.2
+requests==2.31.0
+
+# Type hints
+mypy==1.7.1
+types-requests==2.31.0.10

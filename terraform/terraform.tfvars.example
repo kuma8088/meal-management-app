@@ -1,0 +1,10 @@
+# AWS設定
+aws_region  = "ap-northeast-1"
+environment = "dev"
+
+# プロジェクト設定
+project_name = "meal-management-app"
+
+# LINE設定（実際の値は環境変数またはSecrets Managerから取得）
+line_channel_secret       = "your-line-channel-secret"
+line_channel_access_token = "your-line-channel-access-token"

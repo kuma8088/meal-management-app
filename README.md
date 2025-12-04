@@ -1,0 +1,114 @@
+# 食事管理アプリケーション
+
+AWS サーバレスアーキテクチャを活用した食事管理アプリケーションです。LINE とブラウザの両方からアクセス可能で、食事記録の登録、栄養情報の自動計算、体重目標管理、AI による食事アドバイスを提供します。
+
+## 技術スタック
+
+- **インフラ管理**: Terraform
+- **コンピューティング**: AWS Lambda (Python 3.11)
+- **API**: AWS API Gateway (REST API)
+- **データベース**: Amazon DynamoDB
+- **ストレージ**: Amazon S3
+- **認証**: Amazon Cognito, LINE User ID
+- **AI**: Amazon Bedrock (Claude 3)
+- **画像認識**: Amazon Rekognition / Amazon Textract
+- **メッセージング**: LINE Messaging API
+- **ロギング**: Amazon CloudWatch Logs
+- **フロントエンド**: React (TypeScript)
+
+## プロジェクト構成
+
+```
+.
+├── terraform/              # Terraformインフラ定義
+│   ├── provider.tf        # プロバイダー設定
+│   ├── variables.tf       # 変数定義
+│   ├── dynamodb.tf        # DynamoDBテーブル定義
+│   ├── s3.tf              # S3バケット定義
+│   └── outputs.tf         # 出力定義
+├── src/
+│   └── lambda/            # Lambda関数
+│       ├── common/        # 共通ライブラリ
+│       ├── line_handler/  # LINE Webhook Handler
+│       ├── meal_registration/  # 食事登録
+│       └── food_search/   # 食品検索
+└── README.md
+```
+
+## セットアップ手順
+
+### 前提条件
+
+- AWS CLI がインストールされ、設定されていること
+- Terraform >= 1.0 がインストールされていること
+- Python 3.11 がインストールされていること
+- AWS アカウントと適切な権限
+
+### 1. リポジトリのクローン
+
+```bash
+git clone <repository-url>
+cd meal-management-app
+```
+
+### 2. Terraform 変数の設定
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvars を編集して実際の値を設定
+```
+
+### 3. Terraform の初期化と適用
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### 4. Python 依存関係のインストール
+
+```bash
+cd ../src/lambda
+pip install -r requirements.txt
+```
+
+## 開発
+
+### ローカルテスト
+
+```bash
+# ユニットテストの実行
+pytest tests/
+
+# プロパティベーステストの実行
+pytest tests/ -k property
+```
+
+### デプロイ
+
+```bash
+cd terraform
+terraform apply
+```
+
+## 環境変数
+
+以下の環境変数を設定する必要があります：
+
+- `AWS_REGION`: AWS リージョン（デフォルト: ap-northeast-1）
+- `LINE_CHANNEL_SECRET`: LINE チャンネルシークレット
+- `LINE_CHANNEL_ACCESS_TOKEN`: LINE チャンネルアクセストークン
+
+## ドキュメント
+
+詳細な設計書と要件定義書は `.kiro/specs/meal-management-app/` ディレクトリを参照してください。
+
+- [要件定義書](../.kiro/specs/meal-management-app/requirements.md)
+- [設計書](../.kiro/specs/meal-management-app/design.md)
+- [実装計画](../.kiro/specs/meal-management-app/tasks.md)
+
+## ライセンス
+
+MIT License
