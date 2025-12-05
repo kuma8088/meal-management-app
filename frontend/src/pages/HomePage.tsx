@@ -23,6 +23,9 @@ const HomePage: React.FC = () => {
           <Link to="/profile" className="nav-link">
             プロフィール設定
           </Link>
+          <Link to="/goals" className="nav-link">
+            目標設定
+          </Link>
           <button onClick={signOut} className="logout-button">
             ログアウト
           </button>

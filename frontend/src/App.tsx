@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
+import GoalPage from './pages/GoalPage';
 
 /**
  * プライベートルート（認証必須）
@@ -70,6 +71,15 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <ProfilePage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/goals"
+        element={
+          <PrivateRoute>
+            <GoalPage />
           </PrivateRoute>
         }
       />
