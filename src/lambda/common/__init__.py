@@ -62,6 +62,10 @@ from .food_parser import (
 
 from .nutrition_calculator import NutritionCalculator
 
+from .bmr_calculator import BMRCalculator
+
+from .goal_calculator import GoalCalculator
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -119,4 +123,10 @@ __all__ = [
     
     # Nutrition Calculator
     "NutritionCalculator",
+    
+    # BMR Calculator
+    "BMRCalculator",
+
+    # Goal Calculator
+    "GoalCalculator",
 ]
