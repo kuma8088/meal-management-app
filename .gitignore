@@ -55,6 +55,7 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+.hypothesis/
 
 # Node.js (for frontend)
 node_modules/
