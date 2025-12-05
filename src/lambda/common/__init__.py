@@ -54,6 +54,12 @@ from .models import (
     FoodSource
 )
 
+from .food_parser import (
+    StandardFoodParser,
+    OpenFoodFactsClient,
+    FoodMasterImporter
+)
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -103,4 +109,9 @@ __all__ = [
     "MealType",
     "GoalType",
     "FoodSource",
+
+    # Food Parser
+    "StandardFoodParser",
+    "OpenFoodFactsClient",
+    "FoodMasterImporter",
 ]
