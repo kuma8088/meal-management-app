@@ -66,6 +66,8 @@ from .bmr_calculator import BMRCalculator
 
 from .goal_calculator import GoalCalculator
 
+from .profile_manager import ProfileManager
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -129,4 +131,7 @@ __all__ = [
 
     # Goal Calculator
     "GoalCalculator",
+
+    # Profile Manager
+    "ProfileManager",
 ]
