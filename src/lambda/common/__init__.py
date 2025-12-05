@@ -60,6 +60,8 @@ from .food_parser import (
     FoodMasterImporter
 )
 
+from .nutrition_calculator import NutritionCalculator
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -114,4 +116,7 @@ __all__ = [
     "StandardFoodParser",
     "OpenFoodFactsClient",
     "FoodMasterImporter",
+    
+    # Nutrition Calculator
+    "NutritionCalculator",
 ]
