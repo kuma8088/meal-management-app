@@ -2,6 +2,13 @@
 共通ライブラリ
 
 このモジュールは、Lambda関数で共通して使用されるユーティリティを提供します。
+
+注意: 一部のモジュール（food_parser, barcode_recognition等）は外部依存関係が
+必要なため、デフォルトではインポートされません。必要に応じて明示的にインポートしてください。
+
+例:
+    from common.food_parser import StandardFoodParser
+    from common.barcode_recognition import BarcodeRecognition
 """
 
 from .exceptions import (
@@ -54,12 +61,6 @@ from .models import (
     FoodSource
 )
 
-from .food_parser import (
-    StandardFoodParser,
-    OpenFoodFactsClient,
-    FoodMasterImporter
-)
-
 from .nutrition_calculator import NutritionCalculator
 
 from .bmr_calculator import BMRCalculator
@@ -72,6 +73,11 @@ from .food_search import FoodSearch
 
 from .ai_food_search import AIFoodSearch
 
+# 以下のモジュールは外部依存関係（requests）が必要なため、
+# デフォルトではインポートしない。必要に応じて明示的にインポートすること。
+# from .food_parser import StandardFoodParser, OpenFoodFactsClient, FoodMasterImporter
+# from .barcode_recognition import BarcodeRecognition
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -82,15 +88,15 @@ __all__ = [
     "DataIntegrityError",
     "ExternalServiceError",
     "RetryableError",
-    
+
     # Logger
     "get_logger",
     "log_with_context",
-    
+
     # Helpers
     "DynamoDBHelper",
     "S3Helper",
-    
+
     # Validation
     "validate_required",
     "validate_positive_number",
@@ -100,15 +106,15 @@ __all__ = [
     "validate_date_format",
     "validate_email",
     "validate_string_length",
-    
+
     # Retry
     "exponential_backoff_retry",
-    
+
     # Response
     "create_response",
     "success_response",
     "error_response",
-    
+
     # Models
     "User",
     "Meal",
@@ -122,14 +128,9 @@ __all__ = [
     "GoalType",
     "FoodSource",
 
-    # Food Parser
-    "StandardFoodParser",
-    "OpenFoodFactsClient",
-    "FoodMasterImporter",
-    
     # Nutrition Calculator
     "NutritionCalculator",
-    
+
     # BMR Calculator
     "BMRCalculator",
 

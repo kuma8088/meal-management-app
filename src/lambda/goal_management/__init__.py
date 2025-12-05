@@ -1,0 +1,463 @@
+"""
+体重目標管理Lambda関数
+
+要件: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6
+"""
+import json
+import os
+import uuid
+from datetime import datetime, date
+from typing import Dict, Any
+import sys
+from pathlib import Path
+
+# 共通ライブラリをインポートパスに追加
+sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
+
+from common import (
+    DynamoDBHelper,
+    Goal,
+    GoalType,
+    GoalCalculator,
+    BMRCalculator,
+    ValidationError,
+    ResourceNotFoundError,
+    get_logger,
+    success_response,
+    error_response
+)
+
+logger = get_logger(__name__)
+
+# 環境変数
+GOALS_TABLE_NAME = os.environ.get("GOALS_TABLE_NAME", "Goals")
+USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "Users")
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
+
+# DynamoDB Helper
+goals_db = DynamoDBHelper(GOALS_TABLE_NAME, AWS_REGION)
+users_db = DynamoDBHelper(USERS_TABLE_NAME, AWS_REGION)
+
+
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """
+    API Gatewayからのリクエストを処理する
+
+    Args:
+        event: API Gatewayイベント
+        context: Lambda実行コンテキスト
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    try:
+        # リクエストメソッドとパスを取得
+        http_method = event.get("httpMethod", "")
+        path = event.get("path", "")
+        path_parameters = event.get("pathParameters") or {}
+
+        logger.info(
+            f"リクエスト受信: {http_method} {path}",
+            extra={
+                "extra_data": {
+                    "method": http_method,
+                    "path": path,
+                    "path_parameters": path_parameters
+                }
+            }
+        )
+
+        # ルーティング
+        if http_method == "POST" and path == "/goals":
+            return create_goal(event)
+        elif http_method == "GET" and path == "/goals":
+            return list_goals(event)
+        elif http_method == "GET" and "goal_id" in path_parameters:
+            return get_goal(event)
+        elif http_method == "PUT" and "goal_id" in path_parameters:
+            return update_goal(event)
+        else:
+            return error_response(
+                ValidationError(
+                    "Not Found",
+                    details={"method": http_method, "path": path}
+                )
+            )
+
+    except ValidationError as e:
+        logger.warning(f"バリデーションエラー: {e.message}", extra={"extra_data": e.details})
+        return error_response(e)
+    except ResourceNotFoundError as e:
+        logger.warning(f"リソースが見つかりません: {e.message}", extra={"extra_data": e.details})
+        return error_response(e)
+    except Exception as e:
+        logger.error(f"予期しないエラー: {str(e)}", exc_info=True)
+        return error_response(e)
+
+
+def create_goal(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    体重目標を作成する
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+
+    要件: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6
+    """
+    # リクエストボディを解析
+    body = json.loads(event.get("body", "{}"))
+
+    # 必須フィールドのバリデーション
+    user_id = body.get("user_id")
+    if not user_id:
+        raise ValidationError("user_idは必須です", details={"field": "user_id"})
+
+    current_weight = body.get("current_weight")
+    if current_weight is None:
+        raise ValidationError("current_weightは必須です", details={"field": "current_weight"})
+
+    target_weight = body.get("target_weight")
+    if target_weight is None:
+        raise ValidationError("target_weightは必須です", details={"field": "target_weight"})
+
+    target_date_str = body.get("target_date")
+    if not target_date_str:
+        raise ValidationError("target_dateは必須です", details={"field": "target_date"})
+
+    goal_type_str = body.get("goal_type")
+    if not goal_type_str:
+        raise ValidationError("goal_typeは必須です", details={"field": "goal_type"})
+
+    # 日付の変換
+    try:
+        target_date = date.fromisoformat(target_date_str)
+    except ValueError as e:
+        raise ValidationError(
+            "target_dateの形式が無効です（YYYY-MM-DD形式で指定してください）",
+            details={"target_date": target_date_str, "error": str(e)}
+        )
+
+    # goal_typeの変換
+    try:
+        goal_type = GoalType(goal_type_str)
+    except ValueError:
+        raise ValidationError(
+            f"無効なgoal_type: {goal_type_str}（gain, maintain, loseのいずれかを指定してください）",
+            details={"goal_type": goal_type_str}
+        )
+
+    # ユーザー情報を取得してTDEEを取得
+    user_data = users_db.get_item({"user_id": user_id})
+    if not user_data:
+        raise ResourceNotFoundError(
+            f"ユーザーID {user_id} が見つかりません",
+            details={"user_id": user_id}
+        )
+
+    tdee = user_data.get("tdee", 0.0)
+    if tdee <= 0:
+        raise ValidationError(
+            "ユーザーのTDEEが設定されていません。プロフィールを更新してください",
+            details={"user_id": user_id, "tdee": tdee}
+        )
+
+    # 目標計算を実行
+    goal_calculation = GoalCalculator.calculate_goal(
+        current_weight=float(current_weight),
+        target_weight=float(target_weight),
+        target_date=target_date,
+        tdee=float(tdee),
+        goal_type=goal_type
+    )
+
+    # Goalオブジェクトを作成
+    goal_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    goal = Goal(
+        goal_id=goal_id,
+        user_id=user_id,
+        current_weight=float(current_weight),
+        target_weight=float(target_weight),
+        target_date=target_date,
+        goal_type=goal_type,
+        daily_calorie_adjustment=goal_calculation["daily_calorie_adjustment"],
+        target_calories=goal_calculation["target_calories"],
+        recommended_protein=goal_calculation["recommended_protein"],
+        recommended_fat=goal_calculation["recommended_fat"],
+        recommended_carbs=goal_calculation["recommended_carbs"],
+        recommended_exercise_minutes=goal_calculation["recommended_exercise_minutes"],
+        created_at=now,
+        updated_at=now
+    )
+
+    # DynamoDBに保存
+    goals_db.put_item(goal.to_dict())
+
+    logger.info(
+        f"体重目標を作成しました: {goal_id}",
+        extra={
+            "extra_data": {
+                "goal_id": goal_id,
+                "user_id": user_id,
+                "goal_type": goal_type.value,
+                "target_calories": goal_calculation["target_calories"]
+            }
+        }
+    )
+
+    # レスポンスを作成
+    response_data = {
+        "goal_id": goal_id,
+        "daily_calorie_adjustment": goal_calculation["daily_calorie_adjustment"],
+        "target_calories": goal_calculation["target_calories"],
+        "recommended_protein": goal_calculation["recommended_protein"],
+        "recommended_fat": goal_calculation["recommended_fat"],
+        "recommended_carbs": goal_calculation["recommended_carbs"],
+        "recommended_exercise_minutes": goal_calculation["recommended_exercise_minutes"],
+        "created_at": now.isoformat()
+    }
+
+    # 警告メッセージがある場合は追加
+    if goal_calculation["warning"]:
+        response_data["warning"] = goal_calculation["warning"]
+
+    return success_response(response_data, status_code=201)
+
+
+def list_goals(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ユーザーの体重目標リストを取得する
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+
+    要件: 9.1
+    """
+    # クエリパラメータを取得
+    query_params = event.get("queryStringParameters") or {}
+    user_id = query_params.get("user_id")
+
+    if not user_id:
+        raise ValidationError("user_idは必須です", details={"field": "user_id"})
+
+    limit = int(query_params.get("limit", 100))
+
+    # スキャンでuser_idが一致するアイテムを取得
+    filter_expression = "user_id = :user_id"
+    expression_values = {":user_id": user_id}
+
+    items = goals_db.scan(
+        filter_expression=filter_expression,
+        expression_attribute_values=expression_values,
+        limit=limit
+    )
+
+    # ユーザーデータ分離の検証
+    goals = []
+    for item in items:
+        if item.get("user_id") == user_id:  # 二重チェック
+            goals.append(item)
+
+    logger.info(
+        f"体重目標リストを取得しました: {len(goals)}件",
+        extra={
+            "extra_data": {
+                "user_id": user_id,
+                "count": len(goals)
+            }
+        }
+    )
+
+    return success_response({
+        "goals": goals,
+        "count": len(goals)
+    })
+
+
+def get_goal(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    特定の体重目標を取得する
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+
+    要件: 9.1
+    """
+    # パスパラメータからgoal_idを取得
+    path_parameters = event.get("pathParameters") or {}
+    goal_id = path_parameters.get("goal_id")
+
+    if not goal_id:
+        raise ValidationError("goal_idは必須です", details={"field": "goal_id"})
+
+    # クエリパラメータからuser_idを取得（認証用）
+    query_params = event.get("queryStringParameters") or {}
+    user_id = query_params.get("user_id")
+
+    # DynamoDBから体重目標を取得
+    goal_data = goals_db.get_item({"goal_id": goal_id})
+
+    if not goal_data:
+        raise ResourceNotFoundError(
+            f"体重目標 {goal_id} が見つかりません",
+            details={"goal_id": goal_id}
+        )
+
+    # ユーザーデータ分離の検証
+    if user_id and goal_data.get("user_id") != user_id:
+        raise ResourceNotFoundError(
+            "体重目標が見つかりません",
+            details={"goal_id": goal_id}
+        )
+
+    logger.info(
+        f"体重目標を取得しました: {goal_id}",
+        extra={
+            "extra_data": {
+                "goal_id": goal_id,
+                "user_id": goal_data.get("user_id")
+            }
+        }
+    )
+
+    return success_response(goal_data)
+
+
+def update_goal(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    体重目標を更新する
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+
+    要件: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6
+    """
+    # パスパラメータからgoal_idを取得
+    path_parameters = event.get("pathParameters") or {}
+    goal_id = path_parameters.get("goal_id")
+
+    if not goal_id:
+        raise ValidationError("goal_idは必須です", details={"field": "goal_id"})
+
+    # リクエストボディを解析
+    body = json.loads(event.get("body", "{}"))
+
+    # 既存の体重目標を取得
+    existing_goal_data = goals_db.get_item({"goal_id": goal_id})
+
+    if not existing_goal_data:
+        raise ResourceNotFoundError(
+            f"体重目標 {goal_id} が見つかりません",
+            details={"goal_id": goal_id}
+        )
+
+    # ユーザーデータ分離の検証
+    user_id = body.get("user_id")
+    if user_id and existing_goal_data.get("user_id") != user_id:
+        raise ResourceNotFoundError(
+            "体重目標が見つかりません",
+            details={"goal_id": goal_id}
+        )
+
+    # 更新可能なフィールド
+    current_weight = body.get("current_weight")
+    target_weight = body.get("target_weight")
+    target_date_str = body.get("target_date")
+    goal_type_str = body.get("goal_type")
+
+    # 既存のデータをベースに更新
+    updated_data = existing_goal_data.copy()
+    updated_data["updated_at"] = datetime.utcnow().isoformat()
+
+    # 更新があった場合は再計算
+    recalculate = False
+
+    if current_weight is not None:
+        updated_data["current_weight"] = float(current_weight)
+        recalculate = True
+
+    if target_weight is not None:
+        updated_data["target_weight"] = float(target_weight)
+        recalculate = True
+
+    if target_date_str:
+        try:
+            target_date = date.fromisoformat(target_date_str)
+            updated_data["target_date"] = target_date.isoformat()
+            recalculate = True
+        except ValueError as e:
+            raise ValidationError(
+                "target_dateの形式が無効です",
+                details={"target_date": target_date_str, "error": str(e)}
+            )
+
+    if goal_type_str:
+        try:
+            goal_type = GoalType(goal_type_str)
+            updated_data["goal_type"] = goal_type.value
+            recalculate = True
+        except ValueError:
+            raise ValidationError(
+                f"無効なgoal_type: {goal_type_str}",
+                details={"goal_type": goal_type_str}
+            )
+
+    # 再計算が必要な場合
+    if recalculate:
+        # ユーザー情報を取得してTDEEを取得
+        user_data = users_db.get_item({"user_id": existing_goal_data["user_id"]})
+        if not user_data:
+            raise ResourceNotFoundError(
+                f"ユーザーID {existing_goal_data['user_id']} が見つかりません",
+                details={"user_id": existing_goal_data["user_id"]}
+            )
+
+        tdee = user_data.get("tdee", 0.0)
+
+        # 目標計算を実行
+        goal_calculation = GoalCalculator.calculate_goal(
+            current_weight=float(updated_data["current_weight"]),
+            target_weight=float(updated_data["target_weight"]),
+            target_date=date.fromisoformat(updated_data["target_date"]),
+            tdee=float(tdee),
+            goal_type=GoalType(updated_data["goal_type"])
+        )
+
+        # 計算結果を更新
+        updated_data["daily_calorie_adjustment"] = goal_calculation["daily_calorie_adjustment"]
+        updated_data["target_calories"] = goal_calculation["target_calories"]
+        updated_data["recommended_protein"] = goal_calculation["recommended_protein"]
+        updated_data["recommended_fat"] = goal_calculation["recommended_fat"]
+        updated_data["recommended_carbs"] = goal_calculation["recommended_carbs"]
+        updated_data["recommended_exercise_minutes"] = goal_calculation["recommended_exercise_minutes"]
+
+        # 警告メッセージを追加
+        if goal_calculation["warning"]:
+            updated_data["warning"] = goal_calculation["warning"]
+
+    # DynamoDBを更新
+    goals_db.put_item(updated_data)
+
+    logger.info(
+        f"体重目標を更新しました: {goal_id}",
+        extra={
+            "extra_data": {
+                "goal_id": goal_id,
+                "user_id": existing_goal_data.get("user_id")
+            }
+        }
+    )
+
+    return success_response(updated_data)
