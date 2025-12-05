@@ -575,3 +575,365 @@ class TestS3Helper:
         
         # 存在するオブジェクト
         assert helper.object_exists("test-key")
+
+
+class TestBMRCalculator:
+    """BMR/TDEE計算のテスト"""
+    
+    def test_calculate_bmr_male(self):
+        """男性のBMR計算が正しく動作することを確認"""
+        from common import BMRCalculator, Gender
+        
+        # テストケース: 30歳、175cm、70kgの男性
+        # 期待値: 88.362 + (13.397 × 70) + (4.799 × 175) - (5.677 × 30)
+        #       = 88.362 + 937.79 + 839.825 - 170.31
+        #       = 1695.67
+        bmr = BMRCalculator.calculate_bmr(
+            age=30,
+            height=175.0,
+            weight=70.0,
+            gender=Gender.MALE
+        )
+        
+        assert bmr == 1695.67
+    
+    def test_calculate_bmr_female(self):
+        """女性のBMR計算が正しく動作することを確認"""
+        from common import BMRCalculator, Gender
+        
+        # テストケース: 25歳、160cm、55kgの女性
+        # 期待値: 447.593 + (9.247 × 55) + (3.098 × 160) - (4.330 × 25)
+        #       = 447.593 + 508.585 + 495.68 - 108.25
+        #       = 1343.61
+        bmr = BMRCalculator.calculate_bmr(
+            age=25,
+            height=160.0,
+            weight=55.0,
+            gender=Gender.FEMALE
+        )
+        
+        assert bmr == 1343.61
+    
+    def test_calculate_bmr_invalid_age(self):
+        """無効な年齢でValidationErrorが発生することを確認"""
+        from common import BMRCalculator, Gender, ValidationError
+        
+        with pytest.raises(ValidationError) as exc_info:
+            BMRCalculator.calculate_bmr(
+                age=0,
+                height=175.0,
+                weight=70.0,
+                gender=Gender.MALE
+            )
+        assert "年齢" in str(exc_info.value.message)
+        
+        with pytest.raises(ValidationError):
+            BMRCalculator.calculate_bmr(
+                age=-5,
+                height=175.0,
+                weight=70.0,
+                gender=Gender.MALE
+            )
+    
+    def test_calculate_bmr_invalid_height(self):
+        """無効な身長でValidationErrorが発生することを確認"""
+        from common import BMRCalculator, Gender, ValidationError
+        
+        with pytest.raises(ValidationError) as exc_info:
+            BMRCalculator.calculate_bmr(
+                age=30,
+                height=0,
+                weight=70.0,
+                gender=Gender.MALE
+            )
+        assert "身長" in str(exc_info.value.message)
+        
+        with pytest.raises(ValidationError):
+            BMRCalculator.calculate_bmr(
+                age=30,
+                height=-10,
+                weight=70.0,
+                gender=Gender.MALE
+            )
+    
+    def test_calculate_bmr_invalid_weight(self):
+        """無効な体重でValidationErrorが発生することを確認"""
+        from common import BMRCalculator, Gender, ValidationError
+        
+        with pytest.raises(ValidationError) as exc_info:
+            BMRCalculator.calculate_bmr(
+                age=30,
+                height=175.0,
+                weight=0,
+                gender=Gender.MALE
+            )
+        assert "体重" in str(exc_info.value.message)
+        
+        with pytest.raises(ValidationError):
+            BMRCalculator.calculate_bmr(
+                age=30,
+                height=175.0,
+                weight=-5,
+                gender=Gender.MALE
+            )
+    
+    def test_calculate_tdee_sedentary(self):
+        """ほとんど運動しない場合のTDEE計算が正しく動作することを確認"""
+        from common import BMRCalculator, ActivityLevel
+        
+        bmr = 1695.67
+        tdee = BMRCalculator.calculate_tdee(bmr, ActivityLevel.SEDENTARY)
+        
+        # 期待値: 1695.67 × 1.2 = 2034.80
+        assert tdee == 2034.80
+    
+    def test_calculate_tdee_light(self):
+        """軽い運動の場合のTDEE計算が正しく動作することを確認"""
+        from common import BMRCalculator, ActivityLevel
+        
+        bmr = 1695.67
+        tdee = BMRCalculator.calculate_tdee(bmr, ActivityLevel.LIGHT)
+        
+        # 期待値: 1695.67 × 1.375 = 2331.55
+        assert tdee == 2331.55
+    
+    def test_calculate_tdee_moderate(self):
+        """中程度の運動の場合のTDEE計算が正しく動作することを確認"""
+        from common import BMRCalculator, ActivityLevel
+        
+        bmr = 1695.67
+        tdee = BMRCalculator.calculate_tdee(bmr, ActivityLevel.MODERATE)
+        
+        # 期待値: 1695.67 × 1.55 = 2628.29
+        assert tdee == 2628.29
+    
+    def test_calculate_tdee_active(self):
+        """激しい運動の場合のTDEE計算が正しく動作することを確認"""
+        from common import BMRCalculator, ActivityLevel
+        
+        bmr = 1695.67
+        tdee = BMRCalculator.calculate_tdee(bmr, ActivityLevel.ACTIVE)
+        
+        # 期待値: 1695.67 × 1.725 = 2925.03
+        assert tdee == 2925.03
+    
+    def test_calculate_tdee_very_active(self):
+        """非常に激しい運動の場合のTDEE計算が正しく動作することを確認"""
+        from common import BMRCalculator, ActivityLevel
+        
+        bmr = 1695.67
+        tdee = BMRCalculator.calculate_tdee(bmr, ActivityLevel.VERY_ACTIVE)
+        
+        # 期待値: 1695.67 × 1.9 = 3221.77
+        assert tdee == 3221.77
+    
+    def test_calculate_tdee_invalid_bmr(self):
+        """無効なBMRでValidationErrorが発生することを確認"""
+        from common import BMRCalculator, ActivityLevel, ValidationError
+        
+        with pytest.raises(ValidationError) as exc_info:
+            BMRCalculator.calculate_tdee(-100, ActivityLevel.SEDENTARY)
+        assert "BMR" in str(exc_info.value.message)
+    
+    def test_calculate_bmr_and_tdee(self):
+        """BMRとTDEEを一度に計算できることを確認"""
+        from common import BMRCalculator, Gender, ActivityLevel
+        
+        result = BMRCalculator.calculate_bmr_and_tdee(
+            age=30,
+            height=175.0,
+            weight=70.0,
+            gender=Gender.MALE,
+            activity_level=ActivityLevel.MODERATE
+        )
+        
+        assert "bmr" in result
+        assert "tdee" in result
+        assert result["bmr"] == 1695.67
+        assert result["tdee"] == 2628.29
+    
+    def test_calculate_bmr_and_tdee_female(self):
+        """女性のBMRとTDEEを一度に計算できることを確認"""
+        from common import BMRCalculator, Gender, ActivityLevel
+        
+        result = BMRCalculator.calculate_bmr_and_tdee(
+            age=25,
+            height=160.0,
+            weight=55.0,
+            gender=Gender.FEMALE,
+            activity_level=ActivityLevel.LIGHT
+        )
+        
+        assert result["bmr"] == 1343.61
+        # 1343.61 × 1.375 = 1847.46
+        assert result["tdee"] == 1847.46
+
+
+class TestNutritionCalculator:
+    """栄養計算のテスト"""
+    
+    def test_calculate_nutrition_for_amount(self):
+        """指定された量の食品の栄養情報が正しく計算されることを確認"""
+        from common import Food, FoodSource, NutritionCalculator
+        
+        # テスト用の食品を作成（100gあたりの栄養情報）
+        food = Food(
+            food_id="test-food-1",
+            name="テスト食品",
+            calories_per_100g=200.0,
+            protein_per_100g=20.0,
+            fat_per_100g=10.0,
+            carbs_per_100g=30.0,
+            source=FoodSource.STANDARD
+        )
+        
+        # 100gの場合
+        nutrition = NutritionCalculator.calculate_nutrition_for_amount(food, 100.0)
+        assert nutrition["calories"] == 200.0
+        assert nutrition["protein"] == 20.0
+        assert nutrition["fat"] == 10.0
+        assert nutrition["carbs"] == 30.0
+        
+        # 50gの場合
+        nutrition = NutritionCalculator.calculate_nutrition_for_amount(food, 50.0)
+        assert nutrition["calories"] == 100.0
+        assert nutrition["protein"] == 10.0
+        assert nutrition["fat"] == 5.0
+        assert nutrition["carbs"] == 15.0
+        
+        # 200gの場合
+        nutrition = NutritionCalculator.calculate_nutrition_for_amount(food, 200.0)
+        assert nutrition["calories"] == 400.0
+        assert nutrition["protein"] == 40.0
+        assert nutrition["fat"] == 20.0
+        assert nutrition["carbs"] == 60.0
+        
+        # 0gの場合
+        nutrition = NutritionCalculator.calculate_nutrition_for_amount(food, 0.0)
+        assert nutrition["calories"] == 0.0
+        assert nutrition["protein"] == 0.0
+        assert nutrition["fat"] == 0.0
+        assert nutrition["carbs"] == 0.0
+    
+    def test_calculate_nutrition_for_amount_negative(self):
+        """負の量でValidationErrorが発生することを確認"""
+        from common import Food, FoodSource, NutritionCalculator, ValidationError
+        
+        food = Food(
+            food_id="test-food-1",
+            name="テスト食品",
+            calories_per_100g=200.0,
+            protein_per_100g=20.0,
+            fat_per_100g=10.0,
+            carbs_per_100g=30.0,
+            source=FoodSource.STANDARD
+        )
+        
+        with pytest.raises(ValidationError):
+            NutritionCalculator.calculate_nutrition_for_amount(food, -10.0)
+    
+    def test_calculate_total_nutrition(self):
+        """複数の食品の栄養情報が正しく合計されることを確認"""
+        from common import NutritionCalculator
+        
+        foods_nutrition = [
+            {"calories": 100.0, "protein": 10.0, "fat": 5.0, "carbs": 15.0},
+            {"calories": 200.0, "protein": 20.0, "fat": 10.0, "carbs": 30.0},
+            {"calories": 150.0, "protein": 15.0, "fat": 7.5, "carbs": 22.5}
+        ]
+        
+        total = NutritionCalculator.calculate_total_nutrition(foods_nutrition)
+        
+        assert total["total_calories"] == 450.0
+        assert total["total_protein"] == 45.0
+        assert total["total_fat"] == 22.5
+        assert total["total_carbs"] == 67.5
+    
+    def test_calculate_total_nutrition_empty(self):
+        """空のリストで0が返されることを確認"""
+        from common import NutritionCalculator
+        
+        total = NutritionCalculator.calculate_total_nutrition([])
+        
+        assert total["total_calories"] == 0.0
+        assert total["total_protein"] == 0.0
+        assert total["total_fat"] == 0.0
+        assert total["total_carbs"] == 0.0
+    
+    def test_calculate_total_nutrition_single_item(self):
+        """単一の食品で正しく動作することを確認"""
+        from common import NutritionCalculator
+        
+        foods_nutrition = [
+            {"calories": 100.0, "protein": 10.0, "fat": 5.0, "carbs": 15.0}
+        ]
+        
+        total = NutritionCalculator.calculate_total_nutrition(foods_nutrition)
+        
+        assert total["total_calories"] == 100.0
+        assert total["total_protein"] == 10.0
+        assert total["total_fat"] == 5.0
+        assert total["total_carbs"] == 15.0
+    
+    def test_calculate_meal_nutrition(self):
+        """食事全体の栄養情報が正しく計算されることを確認"""
+        from common import Food, MealFood, FoodSource, NutritionCalculator
+        
+        # テスト用の食品データベースを作成
+        food1 = Food(
+            food_id="food-1",
+            name="食品1",
+            calories_per_100g=200.0,
+            protein_per_100g=20.0,
+            fat_per_100g=10.0,
+            carbs_per_100g=30.0,
+            source=FoodSource.STANDARD
+        )
+        
+        food2 = Food(
+            food_id="food-2",
+            name="食品2",
+            calories_per_100g=300.0,
+            protein_per_100g=15.0,
+            fat_per_100g=20.0,
+            carbs_per_100g=40.0,
+            source=FoodSource.STANDARD
+        )
+        
+        food_database = {
+            "food-1": food1,
+            "food-2": food2
+        }
+        
+        # 食事に含まれる食品
+        meal_foods = [
+            MealFood(food_id="food-1", amount=100.0),  # 100g
+            MealFood(food_id="food-2", amount=50.0)    # 50g
+        ]
+        
+        # 栄養情報を計算
+        nutrition = NutritionCalculator.calculate_meal_nutrition(meal_foods, food_database)
+        
+        # 期待値: food1(100g) + food2(50g)
+        # calories: 200 + 150 = 350
+        # protein: 20 + 7.5 = 27.5
+        # fat: 10 + 10 = 20
+        # carbs: 30 + 20 = 50
+        assert nutrition["total_calories"] == 350.0
+        assert nutrition["total_protein"] == 27.5
+        assert nutrition["total_fat"] == 20.0
+        assert nutrition["total_carbs"] == 50.0
+    
+    def test_calculate_meal_nutrition_food_not_found(self):
+        """存在しない食品IDでValidationErrorが発生することを確認"""
+        from common import MealFood, NutritionCalculator, ValidationError
+        
+        food_database = {}
+        meal_foods = [
+            MealFood(food_id="non-existent", amount=100.0)
+        ]
+        
+        with pytest.raises(ValidationError) as exc_info:
+            NutritionCalculator.calculate_meal_nutrition(meal_foods, food_database)
+        
+        assert "non-existent" in str(exc_info.value.message)
