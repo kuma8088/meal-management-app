@@ -70,6 +70,8 @@ from .profile_manager import ProfileManager
 
 from .food_search import FoodSearch
 
+from .ai_food_search import AIFoodSearch
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -139,4 +141,7 @@ __all__ = [
 
     # Food Search
     "FoodSearch",
+
+    # AI Food Search
+    "AIFoodSearch",
 ]
