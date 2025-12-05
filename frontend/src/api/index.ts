@@ -9,3 +9,4 @@ export * from './users';
 export * from './meals';
 export * from './advice';
 export * from './goals';
+export * from './foods';
