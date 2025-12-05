@@ -68,6 +68,11 @@ frontend/dist/
 frontend/.env
 frontend/.env.local
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright/.cache/
+
 # Build artifacts
 *.zip
 lambda_packages/
