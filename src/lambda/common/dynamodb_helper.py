@@ -343,6 +343,90 @@ class DynamoDBHelper:
         max_retries=3,
         retryable_exceptions=(RetryableError, ClientError)
     )
+    def scan(
+        self,
+        filter_expression: Optional[str] = None,
+        expression_attribute_values: Optional[Dict[str, Any]] = None,
+        expression_attribute_names: Optional[Dict[str, str]] = None,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        テーブルをスキャンする
+
+        Args:
+            filter_expression: フィルタ式
+            expression_attribute_values: 式の属性値
+            expression_attribute_names: 式の属性名
+            limit: 取得する最大アイテム数
+
+        Returns:
+            取得されたアイテムのリスト
+
+        Raises:
+            RetryableError: リトライ可能なエラーが発生した場合
+        """
+        try:
+            scan_params = {}
+
+            if filter_expression:
+                scan_params["FilterExpression"] = filter_expression
+
+            if expression_attribute_values:
+                expression_attribute_values = self._convert_floats_to_decimal(expression_attribute_values)
+                scan_params["ExpressionAttributeValues"] = expression_attribute_values
+
+            if expression_attribute_names:
+                scan_params["ExpressionAttributeNames"] = expression_attribute_names
+
+            if limit:
+                scan_params["Limit"] = limit
+
+            response = self.table.scan(**scan_params)
+            items = response.get("Items", [])
+
+            # Decimalをfloatに変換
+            items = [self._convert_decimals_to_float(item) for item in items]
+
+            logger.info(
+                f"スキャンを実行しました: {self.table_name}",
+                extra={
+                    "extra_data": {
+                        "table": self.table_name,
+                        "count": len(items)
+                    }
+                }
+            )
+
+            return items
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+
+            if error_code in ["ProvisionedThroughputExceededException", "RequestLimitExceeded"]:
+                raise RetryableError(
+                    f"DynamoDBのスループット制限に達しました: {self.table_name}",
+                    details={"table": self.table_name, "error": str(e)}
+                )
+            else:
+                logger.error(
+                    f"DynamoDBエラー: {self.table_name}",
+                    extra={
+                        "extra_data": {
+                            "table": self.table_name,
+                            "error_code": error_code,
+                            "error": str(e)
+                        }
+                    }
+                )
+                raise RetryableError(
+                    f"DynamoDB操作に失敗しました: {self.table_name}",
+                    details={"table": self.table_name, "error": str(e)}
+                )
+
+    @exponential_backoff_retry(
+        max_retries=3,
+        retryable_exceptions=(RetryableError, ClientError)
+    )
     def delete_item(self, key: Dict[str, Any]) -> None:
         """
         アイテムを削除する

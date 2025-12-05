@@ -68,6 +68,8 @@ from .goal_calculator import GoalCalculator
 
 from .profile_manager import ProfileManager
 
+from .food_search import FoodSearch
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -134,4 +136,7 @@ __all__ = [
 
     # Profile Manager
     "ProfileManager",
+
+    # Food Search
+    "FoodSearch",
 ]
