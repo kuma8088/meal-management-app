@@ -263,11 +263,41 @@ class TestLINEWebhookHandler:
     @pytest.mark.integration
     @patch('line_handler.LINE_CHANNEL_SECRET', 'test_channel_secret')
     @patch('line_handler.send_reply')
-    def test_image_message(self, mock_send_reply, valid_signature_event):
+    @patch('line_handler.BarcodeRecognition')
+    @patch('line_handler.lambda_client')
+    def test_image_message(self, mock_lambda_client, mock_barcode_class, mock_send_reply, valid_signature_event):
         """
         Feature: meal-management-app, Task 17.1
         統合テスト: 画像メッセージの処理
         """
+        # BarcodeRecognitionのモックを設定
+        mock_barcode_instance = mock_barcode_class.return_value
+        mock_barcode_instance.recognize_from_url.return_value = {
+            "jan_code": "4901234567890",
+            "confidence": 0.95
+        }
+
+        # Lambda invocationのモック設定
+        from io import BytesIO
+        payload_data = json.dumps({
+            "statusCode": 200,
+            "body": json.dumps({
+                "foods": [{
+                    "food_id": "test_food_123",
+                    "name": "テスト食品",
+                    "calories_per_100g": 100,
+                    "protein_per_100g": 5,
+                    "fat_per_100g": 2,
+                    "carbs_per_100g": 15
+                }]
+            })
+        }).encode()
+
+        mock_lambda_client.invoke.return_value = {
+            "StatusCode": 200,
+            "Payload": BytesIO(payload_data)
+        }
+
         # イベントを画像メッセージに変更
         body = json.loads(valid_signature_event["body"])
         body["events"][0]["message"] = {
@@ -295,7 +325,8 @@ class TestLINEWebhookHandler:
         call_args = mock_send_reply.call_args[0]
         message = call_args[1]
 
-        assert "バーコード認識" in message or "準備中" in message
+        # 正常にバーコードが認識され、食品情報が返されたことを確認
+        assert "テスト食品" in message or "カロリー" in message
 
     @pytest.mark.integration
     @patch('line_handler.LINE_CHANNEL_SECRET', 'test_channel_secret')

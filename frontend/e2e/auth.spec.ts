@@ -18,7 +18,7 @@ test.describe('ログイン・ユーザー登録', () => {
       await expect(page.locator('h1')).toContainText('食事管理アプリ');
 
       // ログインタブがアクティブであることを確認
-      const loginTab = page.locator('button:has-text("ログイン")');
+      const loginTab = page.locator('.tab:has-text("ログイン")');
       await expect(loginTab).toHaveClass(/active/);
 
       // ログインフォームが表示されることを確認
@@ -79,12 +79,12 @@ test.describe('ログイン・ユーザー登録', () => {
   test.describe('ユーザー登録フロー', () => {
     test.beforeEach(async ({ page }) => {
       // ユーザー登録タブに切り替え
-      await page.locator('button:has-text("ユーザー登録")').click();
+      await page.locator('.tab:has-text("ユーザー登録")').click();
     });
 
     test('ユーザー登録タブが正しく表示される', async ({ page }) => {
       // ユーザー登録タブがアクティブであることを確認
-      const signupTab = page.locator('button:has-text("ユーザー登録")');
+      const signupTab = page.locator('.tab:has-text("ユーザー登録")');
       await expect(signupTab).toHaveClass(/active/);
 
       // ユーザー登録フォームが表示されることを確認
@@ -99,14 +99,14 @@ test.describe('ログイン・ユーザー登録', () => {
 
     test('タブ切り替えが正しく動作する', async ({ page }) => {
       // ユーザー登録タブがアクティブであることを確認
-      await expect(page.locator('button:has-text("ユーザー登録")')).toHaveClass(/active/);
+      await expect(page.locator('.tab:has-text("ユーザー登録")')).toHaveClass(/active/);
 
       // ログインタブに切り替え
-      await page.locator('button:has-text("ログイン")').click();
+      await page.locator('.tab:has-text("ログイン")').click();
 
       // ログインタブがアクティブになることを確認
-      await expect(page.locator('button:has-text("ログイン")')).toHaveClass(/active/);
-      await expect(page.locator('button:has-text("ユーザー登録")')).not.toHaveClass(/active/);
+      await expect(page.locator('.tab:has-text("ログイン")')).toHaveClass(/active/);
+      await expect(page.locator('.tab:has-text("ユーザー登録")')).not.toHaveClass(/active/);
     });
 
     test('フォーム入力が正しく動作する', async ({ page }) => {

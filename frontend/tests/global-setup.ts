@@ -6,8 +6,11 @@
 import { config } from 'dotenv';
 import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminDeleteUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 
-// .envファイルを読み込み
-config({ path: '.env' });
+// .env.testファイルを優先的に読み込み、なければ.envを読み込み
+config({ path: '.env.test' });
+if (!process.env.VITE_COGNITO_USER_POOL_ID) {
+  config({ path: '.env' });
+}
 
 const USER_POOL_ID = process.env.VITE_COGNITO_USER_POOL_ID || '';
 const TEST_EMAIL = 'e2e-test@example.com';
