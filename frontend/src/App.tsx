@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 import GoalPage from './pages/GoalPage';
 import FoodSearchPage from './pages/FoodSearchPage';
 import MealsPage from './pages/MealsPage';
+import MealRegistrationPage from './pages/MealRegistrationPage';
 import SummaryPage from './pages/SummaryPage';
 
 /**
@@ -101,6 +102,15 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <MealsPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/meals/new"
+        element={
+          <PrivateRoute>
+            <MealRegistrationPage />
           </PrivateRoute>
         }
       />

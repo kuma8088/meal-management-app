@@ -4,7 +4,8 @@
  * Amazon Cognitoを使用した認証管理
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import {
   CognitoUserPool,
   CognitoUser,
@@ -12,7 +13,7 @@ import {
   CognitoUserSession,
   CognitoUserAttribute,
 } from 'amazon-cognito-identity-js';
-import { setAuthTokens, clearAuthTokens, getAuthTokens } from '../api/client';
+import { setAuthTokens, clearAuthTokens } from '../api/client';
 
 // Cognito設定（環境変数から取得）
 const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID || '';
@@ -147,7 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }),
       ];
 
-      userPool.signUp(username, password, attributeList, [], (err, result) => {
+      userPool.signUp(username, password, attributeList, [], (err) => {
         if (err) {
           reject(err);
           return;
@@ -167,7 +168,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         Pool: userPool,
       });
 
-      cognitoUser.confirmRegistration(code, true, (err, result) => {
+      cognitoUser.confirmRegistration(code, true, (err) => {
         if (err) {
           reject(err);
           return;

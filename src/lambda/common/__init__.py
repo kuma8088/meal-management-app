@@ -76,7 +76,7 @@ from .ai_food_search import AIFoodSearch
 # 以下のモジュールは外部依存関係（requests）が必要なため、
 # デフォルトではインポートしない。必要に応じて明示的にインポートすること。
 # from .food_parser import StandardFoodParser, OpenFoodFactsClient, FoodMasterImporter
-# from .barcode_recognition import BarcodeRecognition
+from .barcode_recognition import BarcodeRecognition
 
 __all__ = [
     # Exceptions
@@ -145,4 +145,7 @@ __all__ = [
 
     # AI Food Search
     "AIFoodSearch",
+
+    # Barcode Recognition
+    "BarcodeRecognition",
 ]

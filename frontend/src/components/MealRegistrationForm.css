@@ -1,0 +1,285 @@
+/**
+ * 食事登録フォームのスタイル
+ */
+
+.meal-registration-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-section label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.form-section select,
+.form-section input[type="datetime-local"],
+.form-section input[type="text"],
+.form-section input[type="number"] {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form-section select:focus,
+.form-section input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 食品検索 */
+.search-container {
+  display: flex;
+  gap: 8px;
+}
+
+.search-container input {
+  flex: 1;
+}
+
+.search-button {
+  padding: 10px 20px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.search-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.search-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* 検索結果 */
+.search-results {
+  margin-top: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background-color: #f9fafb;
+}
+
+.food-info {
+  flex: 1;
+}
+
+.food-name {
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.food-nutrition {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.add-button {
+  padding: 6px 16px;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-button:hover {
+  background-color: #059669;
+}
+
+/* 食品リスト */
+.foods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.food-item {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #f9fafb;
+}
+
+.food-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.food-item-name {
+  font-weight: 500;
+  color: #111827;
+}
+
+.remove-button {
+  padding: 4px 12px;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.remove-button:hover {
+  background-color: #dc2626;
+}
+
+.food-item-amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.food-item-amount label {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.food-item-amount input {
+  width: 100px;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+.food-item-amount span {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.food-item-nutrition {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* 栄養情報サマリー */
+.nutrition-summary {
+  padding: 16px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+}
+
+.nutrition-summary label {
+  color: #1e40af;
+  margin-bottom: 12px;
+}
+
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.nutrition-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nutrition-label {
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.nutrition-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+/* エラーメッセージ */
+.error-message {
+  padding: 12px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+/* 送信ボタン */
+.submit-button {
+  padding: 14px 24px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.submit-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* レスポンシブ */
+@media (max-width: 640px) {
+  .nutrition-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .search-container {
+    flex-direction: column;
+  }
+
+  .search-button {
+    width: 100%;
+  }
+}

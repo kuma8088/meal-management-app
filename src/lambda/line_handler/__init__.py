@@ -26,7 +26,8 @@ from common import (
     AuthorizationError,
     get_logger,
     success_response,
-    error_response
+    error_response,
+    BarcodeRecognition
 )
 
 logger = get_logger(__name__)
@@ -222,14 +223,63 @@ def process_image_message(line_user_id: str, message: Dict[str, Any], reply_toke
     # LINE Content APIのURLを構築
     image_url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
 
-    # バーコード認識Lambda関数を呼び出し
+    # バーコード認識を実行
     try:
-        # TODO: バーコード認識Lambda関数の呼び出し
-        # barcode_recognition Lambda関数にimage_urlを渡して、JANコードを取得
-        # その後、food_searchでJANコードから食品を検索
-        # 見つかった食品情報をユーザーに返信
+        # バーコード認識クラスのインスタンス化
+        barcode_recognizer = BarcodeRecognition()
 
-        send_reply(reply_token, "バーコード認識機能は現在準備中です。")
+        # 画像からJANコードを認識
+        result = barcode_recognizer.recognize_from_url(
+            image_url=image_url,
+            line_channel_access_token=LINE_CHANNEL_ACCESS_TOKEN
+        )
+
+        jan_code = result.get("jan_code")
+        confidence = result.get("confidence", 0)
+
+        if not jan_code:
+            send_reply(reply_token, "バーコードを認識できませんでした。もう一度、はっきりとバーコードが写るように撮影してください。")
+            return
+
+        logger.info(f"Recognized JAN code: {jan_code} (confidence: {confidence})")
+
+        # JANコードで食品を検索
+        # food_search Lambda関数を呼び出し
+        try:
+            response = lambda_client.invoke(
+                FunctionName=os.environ.get("FOOD_SEARCH_FUNCTION_NAME", "food_search"),
+                InvocationType='RequestResponse',
+                Payload=json.dumps({
+                    "queryStringParameters": {
+                        "jan_code": jan_code
+                    }
+                })
+            )
+
+            search_result = json.loads(response['Payload'].read())
+
+            if search_result.get("statusCode") == 200:
+                body = json.loads(search_result.get("body", "{}"))
+                foods = body.get("foods", [])
+
+                if foods:
+                    food = foods[0]  # 最初の結果を使用
+                    # 食品情報を整形してメッセージを作成
+                    message = f"【{food.get('name', '不明')}】\n"
+                    message += f"カロリー: {food.get('calories_per_100g', 0):.1f} kcal/100g\n"
+                    message += f"たんぱく質: {food.get('protein_per_100g', 0):.1f} g/100g\n"
+                    message += f"脂質: {food.get('fat_per_100g', 0):.1f} g/100g\n"
+                    message += f"炭水化物: {food.get('carbs_per_100g', 0):.1f} g/100g"
+
+                    send_reply(reply_token, message)
+                else:
+                    send_reply(reply_token, f"JANコード「{jan_code}」の食品情報が見つかりませんでした。")
+            else:
+                send_reply(reply_token, "食品検索中にエラーが発生しました。")
+
+        except Exception as e:
+            logger.error(f"Error searching food: {str(e)}", exc_info=True)
+            send_reply(reply_token, f"JANコード「{jan_code}」で食品を検索できませんでした。")
 
     except Exception as e:
         logger.error(f"Error processing image: {str(e)}", exc_info=True)

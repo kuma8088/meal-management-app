@@ -10,7 +10,7 @@ import type { Meal } from '../types/api';
 import './MealsPage.css';
 
 const MealsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');

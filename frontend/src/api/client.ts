@@ -4,7 +4,8 @@
  * バックエンドAPIとの通信を担当
  */
 
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { ApiError } from '../types/api';
 
 // API Gateway URLは環境変数から取得
