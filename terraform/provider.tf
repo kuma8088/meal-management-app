@@ -8,13 +8,15 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "meal-management-app-terraform-state"
-    key            = "terraform.tfstate"
-    region         = "ap-northeast-1"
-    encrypt        = true
-    dynamodb_table = "terraform-state-lock"
-  }
+  # 初回セットアップ時はローカルバックエンドを使用
+  # S3バケット作成後、以下のS3バックエンドに切り替えてください:
+  # backend "s3" {
+  #   bucket       = "meal-management-app-terraform-state"
+  #   key          = "terraform.tfstate"
+  #   region       = "ap-northeast-1"
+  #   encrypt      = true
+  #   use_lockfile = true
+  # }
 }
 
 provider "aws" {

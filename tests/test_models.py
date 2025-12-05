@@ -5,6 +5,7 @@ import pytest
 import sys
 from datetime import datetime, date
 from pathlib import Path
+from hypothesis import given, strategies as st
 
 # src/lambda/commonをインポートパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "lambda"))
@@ -314,7 +315,7 @@ class TestGoal:
 
 class TestAdviceUsage:
     """AdviceUsageモデルのテスト"""
-    
+
     def test_create_valid_advice_usage(self):
         """有効なアドバイス利用状況の作成"""
         advice_usage = AdviceUsage(
@@ -323,11 +324,11 @@ class TestAdviceUsage:
             usage_count=1,
             last_used_at=datetime.utcnow()
         )
-        
+
         assert advice_usage.user_id == "user123"
         assert advice_usage.date == date(2024, 1, 1)
         assert advice_usage.usage_count == 1
-    
+
     def test_advice_usage_to_dict(self):
         """アドバイス利用状況の辞書変換"""
         advice_usage = AdviceUsage(
@@ -336,9 +337,93 @@ class TestAdviceUsage:
             usage_count=1,
             last_used_at=datetime.utcnow()
         )
-        
+
         usage_dict = advice_usage.to_dict()
-        
+
         assert usage_dict["user_id"] == "user123"
         assert usage_dict["date"] == "2024-01-01"
         assert usage_dict["usage_count"] == 1
+
+
+class TestFoodPropertyBased:
+    """Foodモデルのプロパティベーステスト"""
+
+    @given(
+        food_id=st.text(min_size=1, max_size=50),
+        name=st.text(min_size=1, max_size=100),
+        calories_per_100g=st.floats(
+            min_value=0,
+            max_value=900,
+            allow_nan=False,
+            allow_infinity=False
+        ),
+        protein_per_100g=st.floats(
+            min_value=0,
+            max_value=100,
+            allow_nan=False,
+            allow_infinity=False
+        ),
+        fat_per_100g=st.floats(
+            min_value=0,
+            max_value=100,
+            allow_nan=False,
+            allow_infinity=False
+        ),
+        carbs_per_100g=st.floats(
+            min_value=0,
+            max_value=100,
+            allow_nan=False,
+            allow_infinity=False
+        )
+    )
+    def test_food_required_fields_property(
+        self,
+        food_id,
+        name,
+        calories_per_100g,
+        protein_per_100g,
+        fat_per_100g,
+        carbs_per_100g
+    ):
+        """
+        Feature: meal-management-app, Property 4: 食品マスタの必須フィールド
+
+        任意の食品レコードは、食品名、カロリー（100gあたり）、タンパク質（g）、
+        脂質（g）、炭水化物（g）のすべてのフィールドを持つ必要があります。
+
+        検証: 要件 2.5
+        """
+        # 有効なFood オブジェクトを作成
+        food = Food(
+            food_id=food_id,
+            name=name,
+            calories_per_100g=calories_per_100g,
+            protein_per_100g=protein_per_100g,
+            fat_per_100g=fat_per_100g,
+            carbs_per_100g=carbs_per_100g,
+            source=FoodSource.STANDARD
+        )
+
+        # すべての必須フィールドが存在することを確認
+        assert food.food_id == food_id
+        assert food.name == name
+        assert food.calories_per_100g == calories_per_100g
+        assert food.protein_per_100g == protein_per_100g
+        assert food.fat_per_100g == fat_per_100g
+        assert food.carbs_per_100g == carbs_per_100g
+
+        # to_dict()でもすべてのフィールドが含まれることを確認
+        food_dict = food.to_dict()
+        assert "name" in food_dict
+        assert "calories_per_100g" in food_dict
+        assert "protein_per_100g" in food_dict
+        assert "fat_per_100g" in food_dict
+        assert "carbs_per_100g" in food_dict
+
+        # from_dict()で復元可能であることを確認
+        restored_food = Food.from_dict(food_dict)
+        assert restored_food.name == name
+        assert restored_food.calories_per_100g == calories_per_100g
+        assert restored_food.protein_per_100g == protein_per_100g
+        assert restored_food.fat_per_100g == fat_per_100g
+        assert restored_food.carbs_per_100g == carbs_per_100g
