@@ -33,3 +33,46 @@ output "frontend_website_endpoint" {
   description = "Frontend S3 website endpoint"
   value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
 }
+
+# Cognito outputs
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = aws_cognito_user_pool.main.id
+}
+
+output "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN"
+  value       = aws_cognito_user_pool.main.arn
+}
+
+output "cognito_user_pool_endpoint" {
+  description = "Cognito User Pool endpoint"
+  value       = aws_cognito_user_pool.main.endpoint
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Cognito User Pool Client ID"
+  value       = aws_cognito_user_pool_client.web_client.id
+  sensitive   = true
+}
+
+output "cognito_user_pool_domain" {
+  description = "Cognito User Pool domain"
+  value       = aws_cognito_user_pool_domain.main.domain
+}
+
+# IAM outputs
+output "lambda_execution_role_arn" {
+  description = "Lambda execution role ARN"
+  value       = aws_iam_role.lambda_execution_role.arn
+}
+
+output "lambda_execution_role_name" {
+  description = "Lambda execution role name"
+  value       = aws_iam_role.lambda_execution_role.name
+}
+
+output "api_gateway_cloudwatch_role_arn" {
+  description = "API Gateway CloudWatch role ARN"
+  value       = aws_iam_role.api_gateway_cloudwatch_role.arn
+}

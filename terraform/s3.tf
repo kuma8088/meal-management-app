@@ -77,6 +77,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "food_master" {
     id     = "archive-old-versions"
     status = "Enabled"
 
+    filter {}
+
     noncurrent_version_transition {
       noncurrent_days = 30
       storage_class   = "GLACIER"
@@ -122,6 +124,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "barcode_images" {
   rule {
     id     = "delete-old-images"
     status = "Enabled"
+
+    filter {}
 
     expiration {
       days = 30

@@ -25,6 +25,8 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 │   ├── variables.tf       # 変数定義
 │   ├── dynamodb.tf        # DynamoDBテーブル定義
 │   ├── s3.tf              # S3バケット定義
+│   ├── cognito.tf         # Cognito User Pool定義
+│   ├── iam.tf             # IAMロールとポリシー定義
 │   └── outputs.tf         # 出力定義
 ├── src/
 │   └── lambda/            # Lambda関数
@@ -66,6 +68,14 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+このステップで以下のリソースが作成されます：
+
+- DynamoDB テーブル（Users, Meals, Foods, Goals, AdviceUsage）
+- S3 バケット（terraform-state, food-master, barcode-images, frontend）
+- Cognito User Pool と User Pool Client
+- Lambda 実行用 IAM ロール（DynamoDB、S3、Bedrock、Rekognition へのアクセス権限付き）
+- API Gateway CloudWatch ロール
 
 ### 4. Python 依存関係のインストール
 
