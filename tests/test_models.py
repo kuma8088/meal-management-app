@@ -349,8 +349,8 @@ class TestFoodPropertyBased:
     """Foodモデルのプロパティベーステスト"""
 
     @given(
-        food_id=st.text(min_size=1, max_size=50),
-        name=st.text(min_size=1, max_size=100),
+        food_id=st.text(min_size=1, max_size=50).filter(lambda x: x.strip()),
+        name=st.text(min_size=1, max_size=100).filter(lambda x: x.strip()),
         calories_per_100g=st.floats(
             min_value=0,
             max_value=900,
@@ -427,3 +427,332 @@ class TestFoodPropertyBased:
         assert restored_food.protein_per_100g == protein_per_100g
         assert restored_food.fat_per_100g == fat_per_100g
         assert restored_food.carbs_per_100g == carbs_per_100g
+
+    @given(
+        calories_per_100g=st.floats(
+            min_value=-1000,
+            max_value=-0.1,
+            allow_nan=False,
+            allow_infinity=False
+        )
+    )
+    def test_data_integrity_negative_calories_property(self, calories_per_100g):
+        """
+        Feature: meal-management-app, Property 24: データ整合性の検証
+
+        任意のデータが保存される場合、システムはデータの整合性を検証する必要があります。
+        無効なデータは拒否される必要があります。
+
+        このテストは負の栄養値が正しく拒否されることを検証します。
+
+        検証: 要件 12.2
+        """
+        with pytest.raises(ValidationError):
+            Food(
+                food_id="food123",
+                name="テスト食品",
+                calories_per_100g=calories_per_100g,  # 無効な負の値
+                protein_per_100g=10.0,
+                fat_per_100g=5.0,
+                carbs_per_100g=50.0,
+                source=FoodSource.STANDARD
+            )
+
+    @given(
+        protein_per_100g=st.floats(
+            min_value=-1000,
+            max_value=-0.1,
+            allow_nan=False,
+            allow_infinity=False
+        )
+    )
+    def test_data_integrity_negative_protein_property(self, protein_per_100g):
+        """
+        Feature: meal-management-app, Property 24: データ整合性の検証
+
+        無効なタンパク質値が正しく拒否されることを検証します。
+
+        検証: 要件 12.2
+        """
+        with pytest.raises(ValidationError):
+            Food(
+                food_id="food123",
+                name="テスト食品",
+                calories_per_100g=168.0,
+                protein_per_100g=protein_per_100g,  # 無効な負の値
+                fat_per_100g=5.0,
+                carbs_per_100g=50.0,
+                source=FoodSource.STANDARD
+            )
+
+    def test_data_integrity_empty_name_property(self):
+        """
+        Feature: meal-management-app, Property 24: データ整合性の検証
+
+        空の食品名が正しく拒否されることを検証します。
+
+        検証: 要件 12.2
+        """
+        with pytest.raises(ValidationError):
+            Food(
+                food_id="food123",
+                name="",  # 無効な空文字列
+                calories_per_100g=168.0,
+                protein_per_100g=10.0,
+                fat_per_100g=5.0,
+                carbs_per_100g=50.0,
+                source=FoodSource.STANDARD
+            )
+
+    def test_data_integrity_missing_food_id_property(self):
+        """
+        Feature: meal-management-app, Property 24: データ整合性の検証
+
+        必須フィールド（food_id）が欠落しているデータが正しく拒否されることを検証します。
+
+        検証: 要件 12.2
+        """
+        with pytest.raises((ValidationError, TypeError)):
+            Food(
+                food_id="",  # 無効な空のfood_id
+                name="テスト食品",
+                calories_per_100g=168.0,
+                protein_per_100g=10.0,
+                fat_per_100g=5.0,
+                carbs_per_100g=50.0,
+                source=FoodSource.STANDARD
+            )
+
+
+class TestModelSerialization:
+    """モデルのシリアライズ/デシリアライズテスト"""
+
+    def test_food_serialization_roundtrip(self):
+        """食品モデルのシリアライズ/デシリアライズが可逆的であることを確認"""
+        original = Food(
+            food_id="food123",
+            name="白米",
+            calories_per_100g=168.0,
+            protein_per_100g=2.5,
+            fat_per_100g=0.3,
+            carbs_per_100g=37.1,
+            source=FoodSource.STANDARD,
+            jan_code="1234567890123"
+        )
+
+        # to_dict()とfrom_dict()で往復
+        food_dict = original.to_dict()
+        restored = Food.from_dict(food_dict)
+
+        # すべてのフィールドが同じであることを確認
+        assert restored.food_id == original.food_id
+        assert restored.name == original.name
+        assert restored.calories_per_100g == original.calories_per_100g
+        assert restored.protein_per_100g == original.protein_per_100g
+        assert restored.fat_per_100g == original.fat_per_100g
+        assert restored.carbs_per_100g == original.carbs_per_100g
+        assert restored.jan_code == original.jan_code
+        assert restored.source == original.source
+
+    def test_user_serialization_roundtrip(self):
+        """ユーザーモデルのシリアライズ/デシリアライズが可逆的であることを確認"""
+        original = User(
+            user_id="user123",
+            age=30,
+            height=170.0,
+            weight=70.0,
+            gender=Gender.MALE,
+            activity_level=ActivityLevel.MODERATE,
+            bmr=1500.0,
+            tdee=2000.0,
+            line_user_id="line123"
+        )
+
+        # to_dict()とfrom_dict()で往復
+        user_dict = original.to_dict()
+        restored = User.from_dict(user_dict)
+
+        # すべてのフィールドが同じであることを確認
+        assert restored.user_id == original.user_id
+        assert restored.age == original.age
+        assert restored.height == original.height
+        assert restored.weight == original.weight
+        assert restored.gender == original.gender
+        assert restored.activity_level == original.activity_level
+        assert restored.bmr == original.bmr
+        assert restored.tdee == original.tdee
+        assert restored.line_user_id == original.line_user_id
+
+    def test_meal_serialization_roundtrip(self):
+        """食事モデルのシリアライズ/デシリアライズが可逆的であることを確認"""
+        original = Meal(
+            meal_id="meal123",
+            user_id="user123",
+            meal_type=MealType.BREAKFAST,
+            foods=[
+                MealFood(food_id="food1", amount=100.0),
+                MealFood(food_id="food2", amount=50.0)
+            ],
+            total_calories=500.0,
+            total_protein=20.0,
+            total_fat=10.0,
+            total_carbs=60.0,
+            timestamp=datetime(2024, 1, 1, 9, 0, 0)
+        )
+
+        # to_dict()とfrom_dict()で往復
+        meal_dict = original.to_dict()
+        restored = Meal.from_dict(meal_dict)
+
+        # すべてのフィールドが同じであることを確認
+        assert restored.meal_id == original.meal_id
+        assert restored.user_id == original.user_id
+        assert restored.meal_type == original.meal_type
+        assert len(restored.foods) == len(original.foods)
+        assert restored.total_calories == original.total_calories
+        assert restored.total_protein == original.total_protein
+        assert restored.total_fat == original.total_fat
+        assert restored.total_carbs == original.total_carbs
+
+    def test_goal_serialization_roundtrip(self):
+        """目標モデルのシリアライズ/デシリアライズが可逆的であることを確認"""
+        original = Goal(
+            goal_id="goal123",
+            user_id="user123",
+            current_weight=70.0,
+            target_weight=65.0,
+            target_date=date(2024, 12, 31),
+            goal_type=GoalType.LOSE,
+            daily_calorie_adjustment=-500.0,
+            target_calories=1500.0,
+            recommended_protein=100.0,
+            recommended_fat=50.0,
+            recommended_carbs=150.0,
+            recommended_exercise_minutes=30
+        )
+
+        # to_dict()とfrom_dict()で往復
+        goal_dict = original.to_dict()
+        restored = Goal.from_dict(goal_dict)
+
+        # すべてのフィールドが同じであることを確認
+        assert restored.goal_id == original.goal_id
+        assert restored.user_id == original.user_id
+        assert restored.current_weight == original.current_weight
+        assert restored.target_weight == original.target_weight
+        assert restored.target_date == original.target_date
+        assert restored.goal_type == original.goal_type
+        assert restored.daily_calorie_adjustment == original.daily_calorie_adjustment
+        assert restored.target_calories == original.target_calories
+
+
+class TestModelValidation:
+    """モデルのバリデーションテスト"""
+
+    def test_user_validation_invalid_age(self):
+        """ユーザーの年齢バリデーション"""
+        with pytest.raises(ValidationError):
+            User(
+                user_id="user123",
+                age=0,  # 無効な年齢
+                height=170.0,
+                weight=70.0,
+                gender=Gender.MALE,
+                activity_level=ActivityLevel.MODERATE,
+                bmr=1500.0,
+                tdee=2000.0
+            )
+
+        with pytest.raises(ValidationError):
+            User(
+                user_id="user123",
+                age=200,  # 無効な年齢（範囲外）
+                height=170.0,
+                weight=70.0,
+                gender=Gender.MALE,
+                activity_level=ActivityLevel.MODERATE,
+                bmr=1500.0,
+                tdee=2000.0
+            )
+
+    def test_user_validation_invalid_height(self):
+        """ユーザーの身長バリデーション"""
+        with pytest.raises(ValidationError):
+            User(
+                user_id="user123",
+                age=30,
+                height=20.0,  # 無効な身長（小さすぎる）
+                weight=70.0,
+                gender=Gender.MALE,
+                activity_level=ActivityLevel.MODERATE,
+                bmr=1500.0,
+                tdee=2000.0
+            )
+
+    def test_user_validation_invalid_weight(self):
+        """ユーザーの体重バリデーション"""
+        with pytest.raises(ValidationError):
+            User(
+                user_id="user123",
+                age=30,
+                height=170.0,
+                weight=5.0,  # 無効な体重（小さすぎる）
+                gender=Gender.MALE,
+                activity_level=ActivityLevel.MODERATE,
+                bmr=1500.0,
+                tdee=2000.0
+            )
+
+    def test_food_validation_negative_calories(self):
+        """食品のカロリーバリデーション"""
+        with pytest.raises(ValidationError):
+            Food(
+                food_id="food123",
+                name="テスト食品",
+                calories_per_100g=-10.0,  # 無効な負の値
+                protein_per_100g=10.0,
+                fat_per_100g=5.0,
+                carbs_per_100g=50.0,
+                source=FoodSource.STANDARD
+            )
+
+    def test_meal_validation_empty_foods(self):
+        """食事のフード必須バリデーション"""
+        with pytest.raises(ValidationError):
+            Meal(
+                meal_id="meal123",
+                user_id="user123",
+                meal_type=MealType.BREAKFAST,
+                foods=[],  # 無効な空のリスト
+                total_calories=0.0,
+                total_protein=0.0,
+                total_fat=0.0,
+                total_carbs=0.0,
+                timestamp=datetime.utcnow()
+            )
+
+    def test_meal_food_validation_negative_amount(self):
+        """食事の食品量バリデーション"""
+        with pytest.raises(ValidationError):
+            MealFood(
+                food_id="food123",
+                amount=-10.0  # 無効な負の量
+            )
+
+    def test_goal_validation_invalid_weights(self):
+        """目標の体重バリデーション"""
+        with pytest.raises(ValidationError):
+            Goal(
+                goal_id="goal123",
+                user_id="user123",
+                current_weight=5.0,  # 無効な体重（小さすぎる）
+                target_weight=65.0,
+                target_date=date(2024, 12, 31),
+                goal_type=GoalType.LOSE,
+                daily_calorie_adjustment=-500.0,
+                target_calories=1500.0,
+                recommended_protein=100.0,
+                recommended_fat=50.0,
+                recommended_carbs=150.0,
+                recommended_exercise_minutes=30
+            )
