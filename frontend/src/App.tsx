@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 import GoalPage from './pages/GoalPage';
 import FoodSearchPage from './pages/FoodSearchPage';
 import MealsPage from './pages/MealsPage';
+import SummaryPage from './pages/SummaryPage';
 
 /**
  * プライベートルート（認証必須）
@@ -100,6 +101,15 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <MealsPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/summary"
+        element={
+          <PrivateRoute>
+            <SummaryPage />
           </PrivateRoute>
         }
       />

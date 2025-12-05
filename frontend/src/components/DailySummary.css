@@ -1,0 +1,300 @@
+/**
+ * 1日の総評コンポーネントのスタイル
+ */
+
+.daily-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.daily-summary.loading {
+  padding: 60px 20px;
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+}
+
+.error-message {
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: #c33;
+  font-size: 14px;
+}
+
+.summary-header {
+  text-align: center;
+}
+
+.summary-header h2 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.meal-count {
+  margin: 0;
+  color: #999;
+  font-size: 14px;
+}
+
+.no-meals {
+  padding: 40px 20px;
+  text-align: center;
+  background: #f9fafb;
+  border: 2px dashed #e5e7eb;
+  border-radius: 8px;
+  color: #999;
+}
+
+.no-meals p {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* 栄養情報セクション */
+.nutrition-section {
+  background: linear-gradient(135deg, #f5f7ff 0%, #e7edff 100%);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.nutrition-section h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.nutrition-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nutrition-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutrition-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.label-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.nutrition-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nutrition-bar-background {
+  width: 100%;
+  height: 24px;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.nutrition-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.nutrition-bar.success {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.nutrition-bar.warning {
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.nutrition-bar.over {
+  background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+.nutrition-bar.under {
+  background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.nutrition-target {
+  font-size: 12px;
+  color: #666;
+}
+
+.pfc-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.nutrition-info {
+  font-size: 12px;
+  color: #666;
+}
+
+/* AIアドバイスセクション */
+.advice-section {
+  background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid #f59e0b;
+}
+
+.advice-section h3 {
+  margin: 0 0 16px 0;
+  color: #92400e;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.advice-content {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.advice-text {
+  margin: 0;
+  color: #78350f;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.advice-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.usage-count {
+  color: #92400e;
+  font-weight: 500;
+}
+
+.usage-limit-reached {
+  background: #f59e0b;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* 統計セクション */
+.stats-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.stats-section h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f5f7ff 0%, #e7edff 100%);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.stat-description {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.stat-description.over {
+  color: #ef4444;
+}
+
+.stat-description.under {
+  color: #3b82f6;
+}
+
+.stat-grid-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ratio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ratio-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.ratio-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .pfc-items {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advice-info {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
