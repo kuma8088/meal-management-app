@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import GoalPage from './pages/GoalPage';
 import FoodSearchPage from './pages/FoodSearchPage';
+import MealsPage from './pages/MealsPage';
 
 /**
  * プライベートルート（認証必須）
@@ -90,6 +91,15 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <FoodSearchPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/meals"
+        element={
+          <PrivateRoute>
+            <MealsPage />
           </PrivateRoute>
         }
       />

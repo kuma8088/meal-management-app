@@ -29,6 +29,9 @@ const HomePage: React.FC = () => {
           <Link to="/foods" className="nav-link">
             食品検索
           </Link>
+          <Link to="/meals" className="nav-link">
+            食事記録
+          </Link>
           <button onClick={signOut} className="logout-button">
             ログアウト
           </button>
