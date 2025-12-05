@@ -87,6 +87,30 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
+### フロントエンド開発
+
+```bash
+# frontendディレクトリに移動
+cd frontend
+
+# 依存関係のインストール
+npm install
+
+# 開発サーバーの起動 (http://localhost:5173)
+npm run dev
+
+# プロダクションビルド
+npm run build
+
+# E2Eテストの実行
+npm run test:e2e              # ヘッドレスモード
+npm run test:e2e:ui           # UIモード（インタラクティブ）
+npm run test:e2e:headed       # ヘッド付きモード（ブラウザ表示）
+
+# Linting
+npm run lint
+```
+
 ## アーキテクチャの重要ポイント
 
 ### Lambda関数の役割分担
@@ -139,9 +163,36 @@ pip install -r requirements-dev.txt
 - TTL有効（30日後に自動削除）
 - 1日2回のAIアドバイス生成制限を管理
 
+### フロントエンドアーキテクチャ
+
+React (TypeScript) + Vite で構築されたSPA:
+
+**ディレクトリ構造:**
+- `frontend/src/api/`: APIクライアント（axios）とエンドポイント定義
+- `frontend/src/components/`: 再利用可能なUIコンポーネント
+- `frontend/src/contexts/`: Reactコンテキスト（AuthContext）
+- `frontend/src/pages/`: ページコンポーネント（ルート）
+- `frontend/src/types/`: TypeScript型定義
+- `frontend/e2e/`: Playwright E2Eテスト
+
+**認証フロー:**
+1. AuthContext（`contexts/AuthContext.tsx`）がCognitoセッションを管理
+2. ログイン成功時、トークンをlocalStorageに保存
+3. APIクライアント（`api/client.tsx`）が自動的にAuthorizationヘッダーを追加
+4. 401エラー時、自動ログアウトとログイン画面にリダイレクト
+
+**ルーティング:**
+- PrivateRoute: 認証必須のルート（ホームページなど）
+- PublicRoute: 未認証のみアクセス可能（ログインページ）
+
+**環境変数（frontend/.env）:**
+- `VITE_API_BASE_URL`: API Gateway URL
+- `VITE_COGNITO_USER_POOL_ID`: Cognito User Pool ID
+- `VITE_COGNITO_CLIENT_ID`: Cognito Client ID
+
 ### 環境変数
 
-Terraform変数として管理:
+**バックエンド（Terraform変数）:**
 - `environment`: dev / staging / prod
 - `aws_region`: デフォルト ap-northeast-1
 - `line_channel_secret`: LINE Messaging API Channel Secret
@@ -191,6 +242,22 @@ pytest.iniで定義されているマーカー:
 ### カバレッジ目標
 
 ユニットテストのカバレッジ目標: 80%以上
+
+### E2Eテスト（フロントエンド）
+
+Playwrightを使用したE2Eテスト:
+- テストファイル: `frontend/e2e/`
+- 設定: `frontend/playwright.config.ts`
+- 対象ブラウザ: Chromium, Firefox, Webkit
+- 自動的に開発サーバーを起動してテスト実行
+
+**テスト実行:**
+```bash
+cd frontend
+npm run test:e2e        # ヘッドレスモード
+npm run test:e2e:ui     # UIモード（デバッグに便利）
+npm run test:e2e:headed # ブラウザを表示して実行
+```
 
 ## セキュリティ考慮事項
 
@@ -274,6 +341,12 @@ TDEE = BMR × 活動係数
 ### Lambda関数の構造
 各Lambda関数は独立したディレクトリを持ち、`__init__.py`にハンドラーを実装。
 
+### Lambda関数のパッケージング
+`scripts/package_lambda.sh` を使用してLambda関数をZIPファイルにパッケージング:
+- 各Lambda関数を `lambda_packages/` にZIP化
+- `common/` ライブラリを自動的に含める
+- Terraformデプロイ時に使用
+
 ### 入力バリデーション
 すべてのユーザー入力を検証:
 - 型チェック
@@ -287,6 +360,7 @@ TDEE = BMR × 活動係数
 - [design.md](.kiro/specs/meal-management-app/design.md): 設計書（26個の正確性プロパティを含む）
 - [tasks.md](.kiro/specs/meal-management-app/tasks.md): 実装計画
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): アーキテクチャ概要
+- [frontend/README.md](frontend/README.md): フロントエンド開発ガイド
 
 ## 環境分離
 
