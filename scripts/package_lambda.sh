@@ -47,14 +47,20 @@ for func in "${LAMBDA_FUNCTIONS[@]}"; do
     # 共通ライブラリをコピー
     cp -r "$SRC_DIR/common" "$TMP_DIR/"
 
-    # requirements.txtがあればインストール
+    # 共通の依存関係をインストール
+    if [ -f "$SRC_DIR/requirements.txt" ]; then
+        pip3 install -r "$SRC_DIR/requirements.txt" -t "$TMP_DIR" --quiet --platform manylinux2014_x86_64 --only-binary=:all: 2>/dev/null || \
+        pip3 install -r "$SRC_DIR/requirements.txt" -t "$TMP_DIR" --quiet
+    fi
+
+    # 関数固有のrequirements.txtがあればインストール
     if [ -f "$SRC_DIR/$func/requirements.txt" ]; then
+        pip3 install -r "$SRC_DIR/$func/requirements.txt" -t "$TMP_DIR" --quiet --platform manylinux2014_x86_64 --only-binary=:all: 2>/dev/null || \
         pip3 install -r "$SRC_DIR/$func/requirements.txt" -t "$TMP_DIR" --quiet
     fi
 
-    # ZIPファイルを作成
-    cd "$TMP_DIR"
-    zip -r "$DIST_DIR/${func}.zip" . -q
+    # ZIPファイルを作成（サブシェルでディレクトリ変更）
+    (cd "$TMP_DIR" && zip -r "$DIST_DIR/${func}.zip" . -q)
 
     # 一時ディレクトリを削除
     rm -rf "$TMP_DIR"

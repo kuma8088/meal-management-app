@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 回答スタイル
+
+- 回答は要点のみを簡潔に。コードは実装時のみ記載し、説明時は不要。
+- 実装が完了したら結果のサマリーを報告。
+
 ## プロジェクト概要
 
 AWS サーバレスアーキテクチャを活用した食事管理アプリケーション。LINE とブラウザの両方からアクセス可能で、食事記録の登録、栄養情報の自動計算、体重目標管理、AI による食事アドバイスを提供する。
@@ -128,19 +133,20 @@ npm run lint
 9. **user_profile_management**: ユーザープロフィール管理
 10. **food_master_import**: 日本食品標準成分表とOpen Food Factsからのデータインポート
 
-### データフロー: 食品データとキャッシング
+### データフロー: 食品データとAI検索
 
 重要な設計パターン:
-1. **初期データ**: 日本食品標準成分表（2,538品目）は全てDynamoDBに保存
-2. **食品検索時のフロー**:
-   - DynamoDBで検索（名前、JAN コードなど）
-   - 見つからない場合、Open Food Facts REST APIで外部検索
-3. **キャッシング**: 検索結果は全てDynamoDBに保存、`source` フラグで追跡
+1. **データ保存先**:
+   - DynamoDB: 日本食品標準成分表（2,538品目）
+   - S3: Open Food Facts CSV（1.1GB、AI検索参照用）
+2. **食品検索フロー**:
+   - Step 1: DynamoDB で検索（名前、JAN コードなど）
+   - Step 2: 見つからない場合、AI検索（Bedrock が S3 の CSV を参照）
+   - Step 3: AI検索結果を DynamoDB にキャッシュ（`source: "AI_GENERATED"`）
+3. **データソース管理**: `source` フラグでデータ元を追跡
    - `source: "japanese_standard"`: 日本食品標準成分表より
-   - `source: "external_api"`: Open Food Facts等の外部API経由
-4. **コスト最適化**: DynamoDBは要求ベース課金のため、大規模データ保存が効率的
-   - S3ではなくDynamoDBをプライマリキャッシュとして使用
-   - 外部APIへのアクセス削減（キャッシュヒット時はAPI不要）
+   - `source: "AI_GENERATED"`: AI検索結果（キャッシュ）
+4. **将来拡張**: Open Food Facts REST API フォールバック（未実装）
 
 ### DynamoDB テーブル設計
 

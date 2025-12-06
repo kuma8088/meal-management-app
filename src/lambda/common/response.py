@@ -2,7 +2,7 @@
 APIレスポンスヘルパー
 """
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from .exceptions import AppException
 
 
@@ -54,21 +54,33 @@ def success_response(data: Any, status_code: int = 200) -> Dict[str, Any]:
 
 
 def error_response(
-    error: Exception,
-    request_id: Optional[str] = None
+    error: Any,
+    request_id: Optional[str] = None,
+    status_code: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     エラーレスポンスを作成する
-    
+
     Args:
-        error: 例外オブジェクト
+        error: 例外オブジェクトまたはエラーメッセージ文字列
         request_id: リクエストID
-        
+        status_code: HTTPステータスコード（文字列の場合は必須）
+
     Returns:
         API Gatewayレスポンス
     """
-    if isinstance(error, AppException):
-        status_code = _get_status_code_from_error_code(error.code)
+    if isinstance(error, str):
+        # 文字列の場合
+        http_status = status_code or 500
+        error_body = {
+            "error": {
+                "code": "VALIDATION_ERROR" if http_status == 400 else "INTERNAL_ERROR",
+                "message": error,
+                "details": {}
+            }
+        }
+    elif isinstance(error, AppException):
+        http_status = status_code or _get_status_code_from_error_code(error.code)
         error_body = {
             "error": {
                 "code": error.code,
@@ -77,7 +89,7 @@ def error_response(
             }
         }
     else:
-        status_code = 500
+        http_status = status_code or 500
         error_body = {
             "error": {
                 "code": "INTERNAL_ERROR",
@@ -85,11 +97,11 @@ def error_response(
                 "details": {}
             }
         }
-    
+
     if request_id:
         error_body["error"]["request_id"] = request_id
-    
-    return create_response(status_code, error_body)
+
+    return create_response(http_status, error_body)
 
 
 def _get_status_code_from_error_code(error_code: str) -> int:

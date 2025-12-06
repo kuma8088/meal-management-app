@@ -109,6 +109,24 @@ meal-management-app/
 - React フロントエンドの静的ホスティング
 - 静的ウェブサイトホスティング有効
 
+## 食品検索フロー
+
+食品検索は以下の 2 段階方式で実装:
+
+1. **DynamoDB 検索（プライマリ）**
+   - 日本食品標準成分表（2,538品目）
+   - `source` フラグ: `japanese_standard`
+
+2. **AI 検索（フォールバック）**
+   - DynamoDB で結果が 0 件の場合
+   - `AIFoodSearch` クラス（[ai_food_search.py](../src/lambda/common/ai_food_search.py)）
+   - Bedrock Claude が S3 の食品マスタ CSV を参照
+   - AI 検索結果を DynamoDB にキャッシュ
+   - `source` フラグ: `AI_GENERATED`
+
+3. **将来拡張（未実装）**
+   - Open Food Facts REST API フォールバック
+
 ## 認証・認可
 
 ### Cognito User Pool
