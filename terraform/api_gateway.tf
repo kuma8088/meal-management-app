@@ -161,8 +161,26 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.meals.id,
       aws_api_gateway_resource.meals_item.id,
       aws_api_gateway_resource.users.id,
+      aws_api_gateway_method.users_post.id,
+      aws_api_gateway_integration.users_post.id,
       aws_api_gateway_resource.users_item.id,
+      aws_api_gateway_method.users_item_get.id,
+      aws_api_gateway_integration.users_item_get.id,
+      aws_api_gateway_method.users_item_put.id,
+      aws_api_gateway_integration.users_item_put.id,
       aws_api_gateway_resource.advice_daily.id,
+      aws_api_gateway_resource.goals.id,
+      aws_api_gateway_method.goals_post.id,
+      aws_api_gateway_integration.goals_post.id,
+      aws_api_gateway_resource.goals_item.id,
+      aws_api_gateway_method.goals_item_get.id,
+      aws_api_gateway_integration.goals_item_get.id,
+      aws_api_gateway_resource.users_goals.id,
+      aws_api_gateway_method.users_goals_get.id,
+      aws_api_gateway_integration.users_goals_get.id,
+      aws_api_gateway_resource.foods.id,
+      aws_api_gateway_resource.foods_search.id,
+      aws_api_gateway_resource.foods_item.id,
       aws_api_gateway_authorizer.cognito.id,
     ]))
   }
@@ -182,6 +200,11 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.users_item_get,
     aws_api_gateway_integration.users_item_put,
     aws_api_gateway_integration.advice_daily_post,
+    aws_api_gateway_integration.goals_post,
+    aws_api_gateway_integration.goals_item_get,
+    aws_api_gateway_integration.users_goals_get,
+    aws_api_gateway_integration.foods_search_get,
+    aws_api_gateway_integration.foods_item_get,
   ]
 }
 
@@ -754,6 +777,429 @@ resource "aws_api_gateway_integration_response" "advice_daily_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ========================================
+# Foods API
+# ========================================
+
+# Lambda関数: Food Search
+resource "aws_lambda_function" "food_search" {
+  filename         = "${path.module}/../dist/food_search.zip"
+  function_name    = "${var.project_name}-${var.environment}-food-search"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "food_search.lambda_handler"
+  source_code_hash = fileexists("${path.module}/../dist/food_search.zip") ? filebase64sha256("${path.module}/../dist/food_search.zip") : ""
+  runtime          = "python3.11"
+  timeout          = 30
+
+  environment {
+    variables = {
+      FOODS_TABLE_NAME = aws_dynamodb_table.foods.name
+    }
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-food-search"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# /foods リソース
+resource "aws_api_gateway_resource" "foods" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "foods"
+}
+
+# /foods/search リソース
+resource "aws_api_gateway_resource" "foods_search" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.foods.id
+  path_part   = "search"
+}
+
+# GET /foods/search - 食品検索
+resource "aws_api_gateway_method" "foods_search_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.foods_search.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+
+  request_parameters = {
+    "method.request.querystring.query" = false
+  }
+}
+
+resource "aws_api_gateway_integration" "foods_search_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.foods_search.id
+  http_method             = aws_api_gateway_method.foods_search_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.food_search.invoke_arn
+}
+
+# /foods/{food_id} リソース
+resource "aws_api_gateway_resource" "foods_item" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.foods.id
+  path_part   = "{food_id}"
+}
+
+# GET /foods/{food_id} - 特定の食品取得
+resource "aws_api_gateway_method" "foods_item_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.foods_item.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+
+  request_parameters = {
+    "method.request.path.food_id" = true
+  }
+}
+
+resource "aws_api_gateway_integration" "foods_item_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.foods_item.id
+  http_method             = aws_api_gateway_method.foods_item_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.food_search.invoke_arn
+}
+
+# Lambda permission for foods endpoints
+resource "aws_lambda_permission" "foods_api_gateway" {
+  statement_id  = "AllowAPIGatewayInvokeFoods"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.food_search.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# OPTIONS /foods/search
+resource "aws_api_gateway_method" "foods_search_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.foods_search.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "foods_search_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_search.id
+  http_method = aws_api_gateway_method.foods_search_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "foods_search_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_search.id
+  http_method = aws_api_gateway_method.foods_search_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "foods_search_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_search.id
+  http_method = aws_api_gateway_method.foods_search_options.http_method
+  status_code = aws_api_gateway_method_response.foods_search_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# OPTIONS /foods/{food_id}
+resource "aws_api_gateway_method" "foods_item_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.foods_item.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "foods_item_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_item.id
+  http_method = aws_api_gateway_method.foods_item_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "foods_item_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_item.id
+  http_method = aws_api_gateway_method.foods_item_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "foods_item_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.foods_item.id
+  http_method = aws_api_gateway_method.foods_item_options.http_method
+  status_code = aws_api_gateway_method_response.foods_item_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ========================================
+# Goals API
+# ========================================
+
+# /goals リソース
+resource "aws_api_gateway_resource" "goals" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "goals"
+}
+
+# POST /goals - 目標作成
+resource "aws_api_gateway_method" "goals_post" {
+  rest_api_id          = aws_api_gateway_rest_api.main.id
+  resource_id          = aws_api_gateway_resource.goals.id
+  http_method          = "POST"
+  authorization        = "COGNITO_USER_POOLS"
+  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  request_validator_id = aws_api_gateway_request_validator.body_and_params.id
+}
+
+resource "aws_api_gateway_integration" "goals_post" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.goals.id
+  http_method             = aws_api_gateway_method.goals_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.goal_management.invoke_arn
+}
+
+# /goals/{goal_id} リソース
+resource "aws_api_gateway_resource" "goals_item" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.goals.id
+  path_part   = "{goal_id}"
+}
+
+# GET /goals/{goal_id} - 特定の目標取得
+resource "aws_api_gateway_method" "goals_item_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.goals_item.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+
+  request_parameters = {
+    "method.request.path.goal_id" = true
+  }
+}
+
+resource "aws_api_gateway_integration" "goals_item_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.goals_item.id
+  http_method             = aws_api_gateway_method.goals_item_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.goal_management.invoke_arn
+}
+
+# /users/{user_id}/goals リソース
+resource "aws_api_gateway_resource" "users_goals" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.users_item.id
+  path_part   = "goals"
+}
+
+# GET /users/{user_id}/goals - ユーザーの目標一覧取得
+resource "aws_api_gateway_method" "users_goals_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.users_goals.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+
+  request_parameters = {
+    "method.request.path.user_id" = true
+  }
+}
+
+resource "aws_api_gateway_integration" "users_goals_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.users_goals.id
+  http_method             = aws_api_gateway_method.users_goals_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.goal_management.invoke_arn
+}
+
+# Lambda permission for goals endpoints
+resource "aws_lambda_permission" "goals_api_gateway" {
+  statement_id  = "AllowAPIGatewayInvokeGoals"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.goal_management.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# OPTIONS /goals
+resource "aws_api_gateway_method" "goals_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.goals.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "goals_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals.id
+  http_method = aws_api_gateway_method.goals_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "goals_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals.id
+  http_method = aws_api_gateway_method.goals_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "goals_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals.id
+  http_method = aws_api_gateway_method.goals_options.http_method
+  status_code = aws_api_gateway_method_response.goals_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# OPTIONS /goals/{goal_id}
+resource "aws_api_gateway_method" "goals_item_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.goals_item.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "goals_item_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals_item.id
+  http_method = aws_api_gateway_method.goals_item_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "goals_item_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals_item.id
+  http_method = aws_api_gateway_method.goals_item_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "goals_item_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.goals_item.id
+  http_method = aws_api_gateway_method.goals_item_options.http_method
+  status_code = aws_api_gateway_method_response.goals_item_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# OPTIONS /users/{user_id}/goals
+resource "aws_api_gateway_method" "users_goals_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.users_goals.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "users_goals_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.users_goals.id
+  http_method = aws_api_gateway_method.users_goals_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "users_goals_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.users_goals.id
+  http_method = aws_api_gateway_method.users_goals_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "users_goals_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.users_goals.id
+  http_method = aws_api_gateway_method.users_goals_options.http_method
+  status_code = aws_api_gateway_method_response.users_goals_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }

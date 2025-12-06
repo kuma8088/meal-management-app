@@ -28,10 +28,11 @@ test.describe('ユーザープロフィール設定', () => {
       await expect(page.locator('label:has-text("体重")')).toBeVisible();
       await expect(page.locator('label:has-text("活動レベル")')).toBeVisible();
 
-      // 送信ボタンが表示されることを確認
-      await expect(
-        page.locator('button[type="submit"]:has-text("プロフィールを作成")')
-      ).toBeVisible();
+      // 送信ボタンが表示されることを確認（作成または更新）
+      const submitButton = page.locator('button[type="submit"]');
+      await expect(submitButton).toBeVisible();
+      const buttonText = await submitButton.textContent();
+      expect(buttonText).toMatch(/プロフィールを(作成|更新)/);
     });
 
     test('フォーム入力が正しく動作する', async ({ page }) => {
@@ -91,10 +92,20 @@ test.describe('ユーザープロフィール設定', () => {
     test('バリデーションエラーが表示される', async ({ page }) => {
       await page.goto('/profile');
 
+      // フォームの読み込みを待つ
+      await expect(page.locator('input#age')).toBeVisible();
+
       // 年齢に無効な値を入力
       await page.locator('input#age').fill('200');
-      await page.locator('input#height').fill('170');
-      await page.locator('input#weight').fill('65');
+      // 必要なフィールドが空の場合は埋める
+      const heightInput = page.locator('input#height');
+      const weightInput = page.locator('input#weight');
+      if (!(await heightInput.inputValue())) {
+        await heightInput.fill('170');
+      }
+      if (!(await weightInput.inputValue())) {
+        await weightInput.fill('65');
+      }
 
       // 送信ボタンをクリック
       await page.locator('button[type="submit"]').click();
@@ -106,12 +117,18 @@ test.describe('ユーザープロフィール設定', () => {
     test('必須項目のHTML5バリデーション', async ({ page }) => {
       await page.goto('/profile');
 
-      // 何も入力せずに送信
+      // フォームの読み込みを待つ
+      await expect(page.locator('input#age')).toBeVisible();
+
+      // 年齢を空にする
+      const ageInput = page.locator('input#age');
+      await ageInput.fill('');
+
+      // 送信ボタンをクリック
       const submitButton = page.locator('button[type="submit"]');
       await submitButton.click();
 
       // HTML5バリデーションが動作することを確認
-      const ageInput = page.locator('input#age');
       const isInvalid = await ageInput.evaluate(
         (el: HTMLInputElement) => !el.validity.valid
       );

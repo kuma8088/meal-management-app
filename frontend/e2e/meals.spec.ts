@@ -258,16 +258,19 @@ test.describe('食事記録一覧', () => {
   });
 
   test.describe('検索実行', () => {
-    test('検索ボタンが無効な場合は操作できない', async ({ page }) => {
+    test('検索ボタンが有効で操作できる', async ({ page }) => {
       await page.goto('/meals');
+
+      // ページが読み込まれるまで待つ
+      await expect(page.locator('h1')).toContainText('食事記録');
 
       const searchButton = page.locator('.search-button');
 
+      // 検索ボタンが表示されるまで待つ
+      await expect(searchButton).toBeVisible();
+
       // 検索ボタンが有効であることを確認
       await expect(searchButton).toBeEnabled();
-
-      // 検索実行中の状態をシミュレート
-      // (実際のAPIが必要なため、ここではスキップ)
     });
 
     test('Enterキーで検索を実行できる', async ({ page }) => {

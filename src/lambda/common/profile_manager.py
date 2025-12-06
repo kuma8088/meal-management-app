@@ -73,7 +73,7 @@ class ProfileManager:
         )
 
         # Userオブジェクトを作成
-        now = datetime.now().isoformat()
+        now = datetime.now()
         user = User(
             user_id=user_id,
             line_user_id=line_user_id,
@@ -165,7 +165,7 @@ class ProfileManager:
         user.activity_level = updated_activity_level
         user.bmr = bmr_tdee["bmr"]
         user.tdee = bmr_tdee["tdee"]
-        user.updated_at = datetime.now().isoformat()
+        user.updated_at = datetime.now()
 
         return user
 

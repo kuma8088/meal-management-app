@@ -54,8 +54,14 @@ test.describe('1日の総評', () => {
     test('前日ボタンで日付が戻る', async ({ page }) => {
       await page.goto('/summary');
 
+      // ページタイトルが表示されるまで待つ
+      await expect(page.locator('h1')).toContainText('本日の栄養総評');
+
       const dateInput = page.locator('.date-display input');
       const previousButton = page.locator('.nav-button').filter({ hasText: '前日' });
+
+      // 日付入力が表示されるまで待つ
+      await expect(dateInput).toBeVisible();
 
       const initialDate = await dateInput.inputValue();
 
@@ -108,8 +114,14 @@ test.describe('1日の総評', () => {
     test('本日に戻すボタンが表示される（本日以外）', async ({ page }) => {
       await page.goto('/summary');
 
+      // ページタイトルが表示されるまで待つ
+      await expect(page.locator('h1')).toContainText('本日の栄養総評');
+
       const previousButton = page.locator('.nav-button').filter({ hasText: '前日' });
       const todayButton = page.locator('.today-button');
+
+      // 前日ボタンが表示されるまで待つ
+      await expect(previousButton).toBeVisible();
 
       // 初期状態では本日に戻すボタンが表示されないことを確認
       await expect(todayButton).not.toBeVisible();

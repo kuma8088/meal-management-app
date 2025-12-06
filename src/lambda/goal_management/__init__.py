@@ -20,6 +20,10 @@ from common import (
     GoalType,
     GoalCalculator,
     BMRCalculator,
+    ProfileManager,
+    User,
+    Gender,
+    ActivityLevel,
     ValidationError,
     ResourceNotFoundError,
     get_logger,
@@ -68,12 +72,23 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
         # ルーティング
-        if http_method == "POST" and path == "/goals":
+        # ユーザープロフィール管理
+        if http_method == "POST" and path == "/users":
+            return create_user_profile(event)
+        elif http_method == "GET" and path_parameters.get("user_id") and "goals" not in path:
+            return get_user_profile(event)
+        elif http_method == "PUT" and path_parameters.get("user_id") and "goals" not in path:
+            return update_user_profile(event)
+        # 目標管理
+        elif http_method == "POST" and path == "/goals":
             return create_goal(event)
         elif http_method == "GET" and path == "/goals":
             return list_goals(event)
         elif http_method == "GET" and "goal_id" in path_parameters:
             return get_goal(event)
+        elif http_method == "GET" and "goals" in path:
+            # GET /users/{user_id}/goals
+            return list_user_goals(event)
         elif http_method == "PUT" and "goal_id" in path_parameters:
             return update_goal(event)
         else:
@@ -461,3 +476,235 @@ def update_goal(event: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     return success_response(updated_data)
+
+
+def list_user_goals(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    特定ユーザーの体重目標リストを取得する (GET /users/{user_id}/goals)
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    path_parameters = event.get("pathParameters") or {}
+    user_id = path_parameters.get("user_id")
+
+    if not user_id:
+        raise ValidationError("user_idは必須です", details={"field": "user_id"})
+
+    # スキャンでuser_idが一致するアイテムを取得
+    filter_expression = "user_id = :user_id"
+    expression_values = {":user_id": user_id}
+
+    items = goals_db.scan(
+        filter_expression=filter_expression,
+        expression_attribute_values=expression_values,
+        limit=100
+    )
+
+    # ユーザーデータ分離の検証
+    goals = []
+    for item in items:
+        if item.get("user_id") == user_id:
+            goals.append(item)
+
+    logger.info(
+        f"ユーザー{user_id}の体重目標リストを取得しました: {len(goals)}件",
+        extra={"extra_data": {"user_id": user_id, "count": len(goals)}}
+    )
+
+    return success_response(goals)
+
+
+def create_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ユーザープロフィールを作成する (POST /users)
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    # リクエストボディを解析
+    body = json.loads(event.get("body", "{}"))
+
+    # CognitoのユーザーIDを取得
+    request_context = event.get("requestContext", {})
+    authorizer = request_context.get("authorizer", {})
+    claims = authorizer.get("claims", {})
+    cognito_user_id = claims.get("sub")
+
+    # 必須フィールドのバリデーション
+    age = body.get("age")
+    if age is None:
+        raise ValidationError("ageは必須です", details={"field": "age"})
+
+    gender_str = body.get("gender")
+    if not gender_str:
+        raise ValidationError("genderは必須です", details={"field": "gender"})
+
+    height = body.get("height")
+    if height is None:
+        raise ValidationError("heightは必須です", details={"field": "height"})
+
+    weight = body.get("weight")
+    if weight is None:
+        raise ValidationError("weightは必須です", details={"field": "weight"})
+
+    activity_level_str = body.get("activity_level")
+    if not activity_level_str:
+        raise ValidationError("activity_levelは必須です", details={"field": "activity_level"})
+
+    # genderとactivity_levelの変換
+    try:
+        gender = Gender(gender_str)
+    except ValueError:
+        raise ValidationError(
+            f"無効なgender: {gender_str}（male または female を指定してください）",
+            details={"gender": gender_str}
+        )
+
+    try:
+        activity_level = ActivityLevel(activity_level_str)
+    except ValueError:
+        raise ValidationError(
+            f"無効なactivity_level: {activity_level_str}",
+            details={"activity_level": activity_level_str}
+        )
+
+    # プロフィールを作成
+    user = ProfileManager.create_profile(
+        user_id=cognito_user_id,
+        age=int(age),
+        height=float(height),
+        weight=float(weight),
+        gender=gender,
+        activity_level=activity_level,
+        cognito_user_id=cognito_user_id
+    )
+
+    # DynamoDBに保存
+    users_db.put_item(user.to_dict())
+
+    logger.info(
+        f"ユーザープロフィールを作成しました: {cognito_user_id}",
+        extra={"extra_data": {"user_id": cognito_user_id}}
+    )
+
+    return success_response(user.to_dict(), status_code=201)
+
+
+def get_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ユーザープロフィールを取得する (GET /users/{user_id})
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    path_parameters = event.get("pathParameters") or {}
+    user_id = path_parameters.get("user_id")
+
+    if not user_id:
+        raise ValidationError("user_idは必須です", details={"field": "user_id"})
+
+    # DynamoDBからユーザープロフィールを取得
+    user_data = users_db.get_item({"user_id": user_id})
+
+    if not user_data:
+        raise ResourceNotFoundError(
+            f"ユーザープロフィール {user_id} が見つかりません",
+            details={"user_id": user_id}
+        )
+
+    logger.info(
+        f"ユーザープロフィールを取得しました: {user_id}",
+        extra={"extra_data": {"user_id": user_id}}
+    )
+
+    return success_response(user_data)
+
+
+def update_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    ユーザープロフィールを更新する (PUT /users/{user_id})
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    path_parameters = event.get("pathParameters") or {}
+    user_id = path_parameters.get("user_id")
+
+    if not user_id:
+        raise ValidationError("user_idは必須です", details={"field": "user_id"})
+
+    # リクエストボディを解析
+    body = json.loads(event.get("body", "{}"))
+
+    # 既存のユーザープロフィールを取得
+    existing_user_data = users_db.get_item({"user_id": user_id})
+
+    if not existing_user_data:
+        raise ResourceNotFoundError(
+            f"ユーザープロフィール {user_id} が見つかりません",
+            details={"user_id": user_id}
+        )
+
+    # Userオブジェクトを復元
+    user = User.from_dict(existing_user_data)
+
+    # 更新可能なフィールド
+    age = body.get("age")
+    height = body.get("height")
+    weight = body.get("weight")
+    gender_str = body.get("gender")
+    activity_level_str = body.get("activity_level")
+
+    # gender と activity_level の変換
+    gender = None
+    if gender_str:
+        try:
+            gender = Gender(gender_str)
+        except ValueError:
+            raise ValidationError(
+                f"無効なgender: {gender_str}",
+                details={"gender": gender_str}
+            )
+
+    activity_level = None
+    if activity_level_str:
+        try:
+            activity_level = ActivityLevel(activity_level_str)
+        except ValueError:
+            raise ValidationError(
+                f"無効なactivity_level: {activity_level_str}",
+                details={"activity_level": activity_level_str}
+            )
+
+    # プロフィールを更新
+    updated_user = ProfileManager.update_profile(
+        user=user,
+        age=int(age) if age is not None else None,
+        height=float(height) if height is not None else None,
+        weight=float(weight) if weight is not None else None,
+        gender=gender,
+        activity_level=activity_level
+    )
+
+    # DynamoDBを更新
+    users_db.put_item(updated_user.to_dict())
+
+    logger.info(
+        f"ユーザープロフィールを更新しました: {user_id}",
+        extra={"extra_data": {"user_id": user_id}}
+    )
+
+    return success_response(updated_user.to_dict())

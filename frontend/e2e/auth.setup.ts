@@ -30,7 +30,44 @@ setup('authenticate', async ({ page }) => {
   // ログイン成功の確認
   await expect(page.locator('text=ようこそ')).toBeVisible({ timeout: 10000 });
 
-  console.log('ログイン成功 - 認証状態を保存中...');
+  console.log('ログイン成功 - プロフィールを作成中...');
+
+  // テスト用のプロフィールを作成（APIを直接呼び出し）
+  const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+  try {
+    // プロフィール作成APIを呼び出し
+    await page.evaluate(async (apiUrl) => {
+      const response = await fetch(`${apiUrl}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('idToken')}`,
+        },
+        body: JSON.stringify({
+          age: 30,
+          gender: 'male',
+          height: 170,
+          weight: 70,
+          activity_level: 'moderate',
+        }),
+      });
+
+      if (!response.ok && response.status !== 409) {
+        // 409 (Conflict) = 既に存在する場合は無視
+        throw new Error(`Failed to create profile: ${response.status}`);
+      }
+
+      return response.json();
+    }, apiBaseUrl);
+
+    console.log('プロフィールを作成しました');
+  } catch (error: any) {
+    // プロフィール作成失敗は警告のみ（既に存在する可能性）
+    console.warn('プロフィール作成の警告:', error.message);
+  }
+
+  console.log('認証状態を保存中...');
 
   // 認証状態を保存
   await page.context().storageState({ path: authFile });

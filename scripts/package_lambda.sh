@@ -49,7 +49,7 @@ for func in "${LAMBDA_FUNCTIONS[@]}"; do
 
     # requirements.txtがあればインストール
     if [ -f "$SRC_DIR/$func/requirements.txt" ]; then
-        pip install -r "$SRC_DIR/$func/requirements.txt" -t "$TMP_DIR" --quiet
+        pip3 install -r "$SRC_DIR/$func/requirements.txt" -t "$TMP_DIR" --quiet
     fi
 
     # ZIPファイルを作成

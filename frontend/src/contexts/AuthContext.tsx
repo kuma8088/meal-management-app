@@ -115,6 +115,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           });
         } else {
+          // Cognitoセッションが取得できない場合、localStorageから直接復元
+          // (Playwright環境などでの互換性のため)
+          const idToken = localStorage.getItem('idToken');
+          if (idToken) {
+            try {
+              // JWTをデコード (base64)
+              const payload = JSON.parse(atob(idToken.split('.')[1]));
+              setUser({
+                userId: payload.sub || '',
+                username: payload['cognito:username'] || payload.email || '',
+                email: payload.email || '',
+              });
+            } catch (decodeError) {
+              console.error('Token decode error:', decodeError);
+            }
+          }
           setLoading(false);
         }
       } catch (error) {

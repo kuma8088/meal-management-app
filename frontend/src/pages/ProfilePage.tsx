@@ -10,7 +10,7 @@ import type { UserProfile, CreateUserProfileRequest } from '../types/api';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -21,6 +21,11 @@ const ProfilePage: React.FC = () => {
    */
   useEffect(() => {
     const loadProfile = async () => {
+      // AuthContextの初期化を待つ
+      if (authLoading) {
+        return;
+      }
+
       if (!user) return;
 
       try {
@@ -41,7 +46,7 @@ const ProfilePage: React.FC = () => {
     };
 
     loadProfile();
-  }, [user]);
+  }, [user, authLoading]);
 
   /**
    * プロフィールを保存

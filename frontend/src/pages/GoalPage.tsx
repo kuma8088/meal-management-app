@@ -11,7 +11,7 @@ import type { UserProfile, Goal, CreateGoalRequest } from '../types/api';
 import './GoalPage.css';
 
 const GoalPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [createdGoal, setCreatedGoal] = useState<Goal | null>(null);
@@ -24,6 +24,11 @@ const GoalPage: React.FC = () => {
    */
   useEffect(() => {
     const loadData = async () => {
+      // AuthContextの初期化を待つ
+      if (authLoading) {
+        return;
+      }
+
       if (!user) {
         setLoading(false);
         return;
@@ -61,7 +66,7 @@ const GoalPage: React.FC = () => {
     };
 
     loadData();
-  }, [user]);
+  }, [user, authLoading]);
 
   /**
    * 目標作成

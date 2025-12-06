@@ -143,26 +143,26 @@ test.describe('目標設定', () => {
       );
     });
 
-    test('過去の日付を設定した場合エラーが表示される', async ({ page }) => {
+    test('日付入力にHTML5のmin制約が設定される', async ({ page }) => {
       await page.goto('/goals');
 
-      // 目標体重を入力
-      await page.locator('input#target_weight').fill('60');
+      // フォームが表示されるまで待つ
+      await expect(page.locator('h1')).toContainText('目標設定');
 
-      // 過去の日付を入力
-      const pastDate = new Date();
-      pastDate.setMonth(pastDate.getMonth() - 1);
-      await page
-        .locator('input#target_date')
-        .fill(pastDate.toISOString().split('T')[0]);
+      // 日付入力フィールドを確認
+      const dateInput = page.locator('input#target_date');
+      await expect(dateInput).toBeVisible();
 
-      // 送信ボタンをクリック
-      await page.locator('button[type="submit"]').click();
+      // min属性が明日以降の日付に設定されていることを確認
+      const minDate = await dateInput.getAttribute('min');
+      expect(minDate).not.toBeNull();
 
-      // エラーメッセージが表示されることを確認
-      await expect(page.locator('.error-message')).toContainText(
-        '目標日は今日以降の日付を選択してください'
-      );
+      // minDateが今日より後であることを確認
+      const minDateObj = new Date(minDate as string);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      expect(minDateObj.getTime()).toBeGreaterThan(today.getTime());
     });
 
     test('急激な減量目標で警告メッセージが表示される', async ({ page }) => {

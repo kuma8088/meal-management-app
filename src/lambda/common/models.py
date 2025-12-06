@@ -134,10 +134,8 @@ class User:
     
     def to_dict(self) -> dict:
         """辞書形式に変換"""
-        return {
+        result = {
             "user_id": self.user_id,
-            "line_user_id": self.line_user_id,
-            "cognito_user_id": self.cognito_user_id,
             "age": self.age,
             "height": self.height,
             "weight": self.weight,
@@ -145,9 +143,19 @@ class User:
             "activity_level": self.activity_level.value if isinstance(self.activity_level, ActivityLevel) else self.activity_level,
             "bmr": self.bmr,
             "tdee": self.tdee,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
+
+        # None値のフィールドは除外（DynamoDBのGSI対応）
+        if self.line_user_id is not None:
+            result["line_user_id"] = self.line_user_id
+        if self.cognito_user_id is not None:
+            result["cognito_user_id"] = self.cognito_user_id
+        if self.created_at is not None:
+            result["created_at"] = self.created_at.isoformat()
+        if self.updated_at is not None:
+            result["updated_at"] = self.updated_at.isoformat()
+
+        return result
     
     @classmethod
     def from_dict(cls, data: dict) -> "User":

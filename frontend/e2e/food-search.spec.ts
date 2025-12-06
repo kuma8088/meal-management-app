@@ -129,17 +129,24 @@ test.describe('食品検索', () => {
       await expect(aiCheckbox).not.toBeChecked();
     });
 
-    test('空の検索でエラーメッセージが表示される', async ({ page }) => {
+    test('空の検索では検索ボタンが無効になる', async ({ page }) => {
       await page.goto('/foods');
 
-      // 何も入力せずに検索ボタンをクリック
-      const searchButton = page.locator('.search-button');
-      await searchButton.click();
+      // ページが読み込まれるまで待つ
+      await expect(page.locator('h1')).toContainText('食品検索');
 
-      // エラーメッセージが表示されることを確認
-      await expect(page.locator('.error-message')).toContainText(
-        '検索キーワードを入力してください'
-      );
+      // 空の入力状態で検索ボタンが無効になっていることを確認
+      const searchButton = page.locator('.search-button');
+      await expect(searchButton).toBeDisabled();
+
+      // 入力すると検索ボタンが有効になることを確認
+      const searchInput = page.locator('input#food-name');
+      await searchInput.fill('りんご');
+      await expect(searchButton).toBeEnabled();
+
+      // 入力を空にすると再び無効になることを確認
+      await searchInput.fill('');
+      await expect(searchButton).toBeDisabled();
     });
 
     test('検索結果が表示される（APIモックが必要）', async ({ page }) => {

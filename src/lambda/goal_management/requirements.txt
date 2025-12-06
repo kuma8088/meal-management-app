@@ -1,0 +1,8 @@
+# Lambda関数の依存関係
+# boto3とbotocoreはLambda環境に含まれているため不要
+
+# HTTP リクエスト
+requests==2.31.0
+
+# 日時処理
+python-dateutil==2.8.2

@@ -11,7 +11,7 @@ import type { UserProfile, Goal } from '../types/api';
 import './SummaryPage.css';
 
 const SummaryPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -32,6 +32,11 @@ const SummaryPage: React.FC = () => {
    */
   useEffect(() => {
     const loadData = async () => {
+      // AuthContextの初期化を待つ
+      if (authLoading) {
+        return;
+      }
+
       if (!user) return;
 
       try {
@@ -62,7 +67,7 @@ const SummaryPage: React.FC = () => {
     };
 
     loadData();
-  }, [user]);
+  }, [user, authLoading]);
 
   /**
    * 日付を戻す
