@@ -80,8 +80,9 @@
    - API Gateway が Webhook を受信
    - LINE Handler Lambda がメッセージを解析
    - バーコード画像の場合、Rekognition で JAN コード抽出
-   - Food Search Lambda で食品マスタを検索
-   - 見つからない場合、Bedrock で AI 検索
+   - Food Search Lambda で DynamoDB の食品マスタを検索
+   - 見つからない場合、Open Food Facts REST API で外部検索
+   - 検索結果は `source` フラグ付きで DynamoDB にキャッシュ
    - Meal Registration Lambda で食事記録を作成
    - Nutrition Calculation Lambda で栄養情報を計算
    - DynamoDB に保存
@@ -104,7 +105,7 @@
    - 利用回数制限（1 日 2 回）をチェック
    - 目標カロリーとの差分を計算
    - Bedrock Claude API を呼び出し
-   - S3 の食品マスタ CSV を参照情報として提供
+   - DynamoDB の食品マスタと過去の検索キャッシュを参照情報として提供
    - 300 文字以内のアドバイスを生成
    - DynamoDB に利用回数を記録
    - ユーザーにアドバイスを返す
@@ -181,7 +182,7 @@
 
 #### 3. Food Search (`food_search`)
 
-**責務**: 食品マスタを検索し、候補リストを返す
+**責務**: DynamoDB の食品マスタを検索し、候補リストを返す。見つからない場合は外部API検索を実施
 
 **入力**:
 
@@ -189,7 +190,7 @@
 {
     "query": str,           # 食品名またはJANコード
     "search_type": str,     # "name" | "jan_code"
-    "use_ai": bool          # AI検索を使用するか
+    "use_fallback": bool    # 見つからない場合に外部API検索を使用するか
 }
 ```
 
@@ -206,7 +207,7 @@
             "fat_per_100g": float,
             "carbs_per_100g": float,
             "jan_code": str | None,
-            "source": str  # "STANDARD" | "OPEN_FOOD_FACTS" | "AI_GENERATED"
+            "source": str  # "japanese_standard" | "external_api"
         }
     ]
 }
@@ -620,7 +621,7 @@ class Food:
     fat_per_100g: float
     carbs_per_100g: float
     jan_code: Optional[str]
-    source: Literal["STANDARD", "OPEN_FOOD_FACTS", "AI_GENERATED"]
+    source: Literal["japanese_standard", "external_api"]
     created_at: datetime
     updated_at: datetime
 ```
@@ -673,7 +674,7 @@ _プロパティとは、システムのすべての有効な実行において�
 
 ### プロパティ 3: 食品マスタのデータ同期
 
-*任意の*食品データが DynamoDB に登録される場合、同じデータが CSV 形式で S3 バケットにも保存される必要があります。
+*任意の*食品データが DynamoDB に登録される場合、DynamoDB がプライマリキャッシュとして機能し、すべての検索結果が DynamoDB に保存される必要があります（`source` フラグで外部API結果を追跡）。
 
 **検証: 要件 2.3**
 
@@ -683,15 +684,15 @@ _プロパティとは、システムのすべての有効な実行において�
 
 **検証: 要件 2.5**
 
-### プロパティ 5: AI 検索結果のマーキング
+### プロパティ 5: 外部API検索結果のマーキング
 
-*任意の*AI 検索によって見つかった食品は、DynamoDB に保存される際にデータソースフィールドが「AI_GENERATED」に設定される必要があります。
+*任意の*外部API（Open Food Facts等）の検索によって見つかった食品は、DynamoDB に保存される際に `source` フィールドが「external_api」に設定される必要があります。
 
 **検証: 要件 3.4, 3.5**
 
 ### プロパティ 6: 食品検索のキャッシング
 
-*任意の*食品が一度 AI 検索で見つかった場合、同じ食品の 2 回目の検索では DynamoDB のキャッシュから結果が返され、Bedrock API は呼び出されない必要があります。
+*任意の*食品が一度外部API検索で見つかった場合、同じ食品の 2 回目の検索では DynamoDB のキャッシュから結果が返され、外部API は呼び出されない必要があります。
 
 **検証: 要件 3.6**
 

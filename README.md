@@ -91,7 +91,9 @@ terraform apply
 このステップで以下のリソースが作成されます：
 
 - DynamoDB テーブル（Users, Meals, Foods, Goals, AdviceUsage）
-- S3 バケット（terraform-state, food-master, barcode-images, frontend）
+  - **Foods テーブル**: 日本食品標準成分表（2,538品目）と外部API検索結果のキャッシュを保存
+- S3 バケット（terraform-state, barcode-images, frontend）
+  - 食品マスタは DynamoDB をプライマリ使用（要求ベース課金で効率的）
 - Cognito User Pool と User Pool Client
 - Lambda 実行用 IAM ロール（DynamoDB、S3、Bedrock、Rekognition へのアクセス権限付き）
 - API Gateway CloudWatch ロール
