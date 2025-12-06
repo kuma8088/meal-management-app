@@ -74,29 +74,40 @@ def convert_japanese_food_table_to_csv(
 
             # 日本食品標準成分表の構造：
             # - 行1：更新日
-            # - 行2-7：マルチレベルヘッダー
+            # - 行2-7：マルチレベルヘッダー（複数行に分散）
             # - 行13以降：実データ
 
             row_count = 0
 
-            # 行2をシンプルなヘッダーとして使用
-            header_row = None
-            for cell in worksheet[2]:
-                if header_row is None:
-                    header_row = []
-                header_row.append(cell.value if cell.value else "")
+            # マルチレベルヘッダーを統合
+            # 日本食品標準成分表の特殊な構造に対応：
+            # - 列1-3: Row 2から取得（食品群、食品番号、索引番号）
+            # - 列4以降: Row 3から取得（食品名、栄養値など）
+            header_candidates = []
+            for col_idx in range(1, 66):  # 65カラム
+                header_value = ""
 
-            # ヘッダーをクリーンアップして書き込み
-            cleaned_header = []
-            for header in header_row:
-                if header:
-                    cleaned_header.append(str(header).strip())
+                if col_idx <= 3:
+                    # 最初の3列はRow 2から取得
+                    cell = worksheet.cell(row=2, column=col_idx)
+                    if cell.value:
+                        header_value = str(cell.value).strip()
                 else:
-                    cleaned_header.append("")
+                    # 4列目以降はRow 3から取得
+                    cell = worksheet.cell(row=3, column=col_idx)
+                    if cell.value:
+                        header_value = str(cell.value).strip()
+                    else:
+                        # Row 3に値がなければRow 2を確認
+                        cell = worksheet.cell(row=2, column=col_idx)
+                        if cell.value:
+                            header_value = str(cell.value).strip()
 
-            writer.writerow(cleaned_header)
+                header_candidates.append(header_value)
+
+            writer.writerow(header_candidates)
             row_count += 1
-            print(f"  ヘッダー: {len(cleaned_header)}カラム")
+            print(f"  ヘッダー: {len(header_candidates)}カラム")
 
             # データ行（行13以降）を書き込み
             data_start_row = 13

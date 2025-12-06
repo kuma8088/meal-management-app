@@ -11,6 +11,7 @@ import json
 import boto3
 from pathlib import Path
 from typing import Dict, List, Tuple
+from decimal import Decimal
 import uuid
 
 # DynamoDBクライアント
@@ -86,19 +87,24 @@ def import_food_master_csv(
                         'food_number': str(row.get('食\u3000品\u3000番\u3000号', '')).strip() or '',
                         'food_name': str(row.get('食\u3000品\u3000名', '')).strip() or 'unknown',
                         'source': 'japanese_standard',
-                        'calories': 0,  # デフォルト値
-                        'protein': 0,
-                        'fat': 0,
-                        'carbs': 0,
+                        'calories': Decimal('0'),  # DynamoDB用Decimal
+                        'protein': Decimal('0'),
+                        'fat': Decimal('0'),
+                        'carbs': Decimal('0'),
                         'created_at': int(__import__('time').time()),
                     }
 
                     # 栄養情報を抽出（カラム名が複雑なため、対応するカラムを探す）
                     for key, value in row.items():
-                        try:
-                            val = float(str(value).strip()) if value and str(value).strip() else None
-                        except (ValueError, TypeError):
-                            val = None
+                        val = None
+                        if value and str(value).strip():
+                            try:
+                                # 括弧（推定値）を削除して変換
+                                clean_value = str(value).strip().replace('(', '').replace(')', '').strip()
+                                if clean_value:
+                                    val = Decimal(clean_value)
+                            except:
+                                val = None
 
                         # カロリーを探す
                         if 'エネルギー' in key or 'kcal' in key.lower():
@@ -147,8 +153,8 @@ def import_food_master_csv(
 def main():
     """メイン処理"""
     csv_file = "/Users/naoya/Develop/mealmgtsystem/data/food_master.csv"
-    table_name = "Foods"
-    max_rows = 100  # テスト: 最初の100行
+    table_name = "meal-management-app-foods-dev"  # 実際のAWSテーブル名
+    max_rows = 2538  # デフォルト: 全行
 
     # コマンドライン引数で上書き可能
     if len(sys.argv) > 1:
