@@ -128,13 +128,19 @@ npm run lint
 9. **user_profile_management**: ユーザープロフィール管理
 10. **food_master_import**: 日本食品標準成分表とOpen Food Factsからのデータインポート
 
-### データフロー: AI検索とキャッシング
+### データフロー: 食品データとキャッシング
 
 重要な設計パターン:
-1. 食品検索時、まずDynamoDBを検索
-2. 見つからない場合、Bedrock Claude がS3の食品マスタCSVを参照してAI検索
-3. AI検索結果は `source: "AI_GENERATED"` フラグ付きでDynamoDBにキャッシュ
-4. 次回同じ食品の検索時はキャッシュを返し、Bedrock APIコストを削減
+1. **初期データ**: 日本食品標準成分表（2,538品目）は全てDynamoDBに保存
+2. **食品検索時のフロー**:
+   - DynamoDBで検索（名前、JAN コードなど）
+   - 見つからない場合、Open Food Facts REST APIで外部検索
+3. **キャッシング**: 検索結果は全てDynamoDBに保存、`source` フラグで追跡
+   - `source: "japanese_standard"`: 日本食品標準成分表より
+   - `source: "external_api"`: Open Food Facts等の外部API経由
+4. **コスト最適化**: DynamoDBは要求ベース課金のため、大規模データ保存が効率的
+   - S3ではなくDynamoDBをプライマリキャッシュとして使用
+   - 外部APIへのアクセス削減（キャッシュヒット時はAPI不要）
 
 ### DynamoDB テーブル設計
 
@@ -326,8 +332,9 @@ TDEE = BMR × 活動係数
 - 300文字以内（超過時は切り詰め）
 
 ### コスト最適化
-- 食品検索のキャッシング（AI_GENERATEDフラグ）
-- 利用回数制限
+- 食品検索のキャッシング（DynamoDBの `source` フラグで外部API結果を追跡）
+- 利用回数制限でAPI呼び出しを削減
+- キャッシュヒット時は外部API呼び出しを回避
 
 ## コーディング規約
 
