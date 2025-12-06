@@ -77,3 +77,8 @@ frontend/playwright/.cache/
 *.zip
 lambda_packages/
 terraform/terraform.tfvars
+
+# Large data files
+data/
+*.csv.gz
+*.xlsx
