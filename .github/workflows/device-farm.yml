@@ -131,9 +131,10 @@ jobs:
           fi
 
           POOL_ARN=$(aws devicefarm list-device-pools \
-            --project-arn "$PROJECT_ARN" \
+            --arn "$PROJECT_ARN" \
             --query "devicePools[?name=='$POOL_NAME'].arn" \
-            --output text)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
           echo "pool_arn=$POOL_ARN" >> $GITHUB_OUTPUT
           echo "Device Pool ARN: $POOL_ARN"
