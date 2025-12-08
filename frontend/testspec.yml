@@ -15,12 +15,12 @@ phases:
       - npm run build
       - echo "Setup completed successfully"
 
-  # テスト実行フェーズ: Playwright E2Eテスト
+  # テスト実行フェーズ: クリティカルパステストのみ実行
   test:
     commands:
       - echo "Starting Playwright E2E tests..."
-      - echo "Running critical path tests with Chromium browser..."
-      - npx playwright test --project=chromium --reporter=html --reporter=json
+      - echo "Running ONLY critical path tests on Device Farm..."
+      - npx playwright test e2e/critical-path.spec.ts --project=chromium --reporter=html --reporter=json --reporter=junit
     finally:
       - echo "Test execution completed"
 
