@@ -74,19 +74,20 @@ jobs:
           TESTSPEC_UPLOAD_ARN=$(aws devicefarm create-upload \
             --project-arn "${{ steps.project.outputs.project_arn }}" \
             --name "testspec-$(date +%s).yml" \
-            --type "APPIUM_PYTHON_TEST_PACKAGE" \
+            --type "APPIUM_WEB_NODE_TEST_SPEC" \
             --query 'upload.arn' \
-            --output text)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
           echo "testspec_upload_arn=$TESTSPEC_UPLOAD_ARN" >> $GITHUB_OUTPUT
           echo "Test Spec Upload ARN: $TESTSPEC_UPLOAD_ARN"
 
-          # Upload test specification file
+          # Get upload URL (get-upload only takes --arn, not --project-arn)
           UPLOAD_URL=$(aws devicefarm get-upload \
-            --project-arn "${{ steps.project.outputs.project_arn }}" \
             --arn "$TESTSPEC_UPLOAD_ARN" \
             --query 'upload.url' \
-            --output text)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
           curl -X PUT "$UPLOAD_URL" --data-binary "@testspec.yml" || echo "Test spec upload completed"
 
@@ -150,7 +151,7 @@ jobs:
             --project-arn "$PROJECT_ARN" \
             --device-pool-arn "$DEVICE_POOL_ARN" \
             --test "{\"type\":\"WEB\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
-            --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoRecording":true}' \
+            --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoCapture":true}' \
             --query 'testRun.arn' \
             --output text \
             --region ${{ env.AWS_REGION }})
