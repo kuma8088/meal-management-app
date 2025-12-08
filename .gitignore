@@ -82,3 +82,7 @@ terraform/terraform.tfvars
 data/
 *.csv.gz
 *.xlsx
+
+content-seeds.md
+portfolio-draft.md
+docs/ROADMAP_STATUS.md

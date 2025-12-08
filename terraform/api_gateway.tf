@@ -1204,10 +1204,102 @@ resource "aws_api_gateway_integration_response" "users_goals_options_200" {
   }
 }
 
+# Lambda関数: Weekly Report (EventBridge scheduled)
+resource "aws_lambda_function" "weekly_report" {
+  filename         = "${path.module}/../dist/weekly_report.zip"
+  function_name    = "${var.project_name}-${var.environment}-weekly-report"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "weekly_report.lambda_handler"
+  source_code_hash = fileexists("${path.module}/../dist/weekly_report.zip") ? filebase64sha256("${path.module}/../dist/weekly_report.zip") : ""
+  runtime          = "python3.11"
+  timeout          = 300 # 5分（複数ユーザーの処理のため）
+  memory_size      = 512
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME          = aws_dynamodb_table.users.name
+      MEALS_TABLE_NAME          = aws_dynamodb_table.meals.name
+      LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
+    }
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-weekly-report"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# Lambda permission for EventBridge
+resource "aws_lambda_permission" "weekly_report_eventbridge" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.weekly_report.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = "arn:aws:events:${var.aws_region}:${data.aws_caller_identity.current.account_id}:rule/${var.project_name}-${var.environment}-weekly-report-schedule"
+}
+
+# Lambda関数: Test User Management (E2E テスト用)
+resource "aws_lambda_function" "test_user_management" {
+  filename         = "${path.module}/../dist/test_user_management.zip"
+  function_name    = "${var.project_name}-${var.environment}-test-user-management"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "test_user_management.lambda_handler"
+  source_code_hash = fileexists("${path.module}/../dist/test_user_management.zip") ? filebase64sha256("${path.module}/../dist/test_user_management.zip") : ""
+  runtime          = "python3.11"
+  timeout          = 60
+  memory_size      = 256
+
+  environment {
+    variables = {
+      COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
+      COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.web_client.id
+    }
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-test-user-management"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# API Gateway Integration: Test User Management
+resource "aws_api_gateway_resource" "test_users" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "test-users"
+}
+
+resource "aws_api_gateway_method" "test_users_get" {
+  rest_api_id          = aws_api_gateway_rest_api.main.id
+  resource_id          = aws_api_gateway_resource.test_users.id
+  http_method          = "GET"
+  authorization        = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.body_and_params.id
+}
+
+resource "aws_api_gateway_integration" "test_users_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.test_users.id
+  http_method             = aws_api_gateway_method.test_users_get.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.test_user_management.invoke_arn
+}
+
+resource "aws_lambda_permission" "test_users_api_gateway" {
+  statement_id  = "AllowAPIGatewayInvokeTestUsers"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.test_user_management.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "arn:aws:execute-api:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${aws_api_gateway_rest_api.main.id}/*"
+}
+
 # Outputs
 output "api_gateway_url" {
   description = "API Gateway URL"
-  value       = "${aws_api_gateway_stage.main.invoke_url}"
+  value       = aws_api_gateway_stage.main.invoke_url
 }
 
 output "line_webhook_url" {

@@ -1,0 +1,252 @@
+name: Device Farm E2E Tests
+
+on:
+  # PRがオープン、同期、または再オープンされた時にトリガー
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/device-farm.yml'
+
+  # 毎週日曜日 9:00 UTC（日本時間 18:00）に定期実行
+  schedule:
+    - cron: '0 9 * * 0'
+
+  # 手動トリガー
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  DEVICEFARM_PROJECT_NAME: mealmgtsystem-e2e-tests-dev
+  ARTIFACT_BUCKET: mealmgtsystem-devicefarm-artifacts-dev
+
+jobs:
+  build-and-upload:
+    name: Build App & Upload to Device Farm
+    runs-on: ubuntu-latest
+
+    outputs:
+      upload-arn: ${{ steps.upload.outputs.upload_arn }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build production bundle
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Package app for Device Farm
+        working-directory: ./frontend
+        run: |
+          # ビルド出力とテスト仕様をZIP化
+          zip -r app-bundle.zip dist testspec.yml -q
+          echo "App bundle created: $(ls -lh app-bundle.zip | awk '{print $5}')"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload app to Device Farm
+        id: upload
+        working-directory: ./frontend
+        run: |
+          UPLOAD_ARN=$(aws devicefarm create-upload \
+            --project-arn "arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:project:${{ env.DEVICEFARM_PROJECT_NAME }}" \
+            --name "mealmgtsystem-app-$(date +%s)" \
+            --type "ANDROID_APP" \
+            --query 'upload.arn' \
+            --output text)
+
+          echo "upload_arn=$UPLOAD_ARN" >> $GITHUB_OUTPUT
+          echo "Upload ARN: $UPLOAD_ARN"
+
+  run-tests:
+    name: Run E2E Tests on Device Farm
+    runs-on: ubuntu-latest
+    needs: build-and-upload
+
+    strategy:
+      matrix:
+        device-pool: [android, ios]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create test run - ${{ matrix.device-pool }}
+        id: test-run
+        run: |
+          PROJECT_ARN="arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:project:${{ env.DEVICEFARM_PROJECT_NAME }}"
+
+          if [ "${{ matrix.device-pool }}" = "android" ]; then
+            DEVICE_POOL_ARN="arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:devicepool:$PROJECT_ARN/android"
+          else
+            DEVICE_POOL_ARN="arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:devicepool:$PROJECT_ARN/ios"
+          fi
+
+          TEST_RUN_ARN=$(aws devicefarm schedule-run \
+            --project-arn "$PROJECT_ARN" \
+            --device-pool-arn "$DEVICE_POOL_ARN" \
+            --app-arn "${{ needs.build-and-upload.outputs.upload-arn }}" \
+            --test-type "WEB" \
+            --test-spec-arn "arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:upload:$PROJECT_ARN/testspec" \
+            --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoRecording":true}' \
+            --query 'testRun.arn' \
+            --output text)
+
+          echo "test_run_arn=$TEST_RUN_ARN" >> $GITHUB_OUTPUT
+          echo "Test Run ARN: $TEST_RUN_ARN"
+
+      - name: Wait for test completion - ${{ matrix.device-pool }}
+        id: wait-tests
+        timeout-minutes: 60
+        run: |
+          TEST_RUN_ARN="${{ steps.test-run.outputs.test_run_arn }}"
+          MAX_ATTEMPTS=180
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            STATUS=$(aws devicefarm get-run \
+              --arn "$TEST_RUN_ARN" \
+              --query 'run.status' \
+              --output text)
+
+            echo "Test run status: $STATUS (Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)"
+
+            if [ "$STATUS" = "COMPLETED" ]; then
+              RESULT=$(aws devicefarm get-run \
+                --arn "$TEST_RUN_ARN" \
+                --query 'run.result' \
+                --output text)
+
+              echo "Test result: $RESULT"
+              echo "test_result=$RESULT" >> $GITHUB_OUTPUT
+              break
+            fi
+
+            ATTEMPT=$((ATTEMPT+1))
+            sleep 20
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "Test run timeout"
+            exit 1
+          fi
+
+      - name: Download test artifacts - ${{ matrix.device-pool }}
+        if: always()
+        run: |
+          TEST_RUN_ARN="${{ steps.test-run.outputs.test_run_arn }}"
+
+          aws devicefarm list-artifacts \
+            --arn "$TEST_RUN_ARN" \
+            --artifact-type "LOG" \
+            --query 'artifacts[*].[name,url]' \
+            --output text | while read name url; do
+              if [ ! -z "$name" ]; then
+                echo "Downloading artifact: $name"
+                curl -o "$name" "$url" 2>/dev/null || echo "Failed to download $name"
+              fi
+            done
+
+      - name: Upload test artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-farm-results-${{ matrix.device-pool }}
+          path: |
+            *.xml
+            *.json
+            *.log
+          retention-days: 30
+
+  report-results:
+    name: Report Test Results
+    runs-on: ubuntu-latest
+    needs: run-tests
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate test report summary
+        run: |
+          echo "# Device Farm E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # アーティファクト情報を表示
+          echo "## Test Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -la device-farm-results-* 2>/dev/null | while read line; do
+            echo "- $line" >> $GITHUB_STEP_SUMMARY
+          done || echo "No test artifacts found" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Device Farm E2E tests completed. See [test results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            })
+
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [report-results]
+    if: always()
+
+    steps:
+      - name: Slack notification
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "Device Farm E2E Test Run Complete",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Device Farm E2E Test Run*\nWorkflow: ${{ github.workflow }}\nStatus: ${{ job.status }}\nBranch: ${{ github.ref_name }}\nRun: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                  }
+                }
+              ]
+            }

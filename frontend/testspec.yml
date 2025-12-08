@@ -1,0 +1,72 @@
+version: 0.0
+
+# Device Farm Test Specification for Meal Management App
+# Playwright E2E テストをDevice Farm上で実行する構成
+
+phases:
+  # 準備フェーズ: アプリケーションのビルドと依存関係のインストール
+  pre_test:
+    commands:
+      - echo "Installing Node.js dependencies..."
+      - npm ci
+      - echo "Installing Playwright browsers..."
+      - npx playwright install chromium
+      - echo "Building production bundle..."
+      - npm run build
+      - echo "Setup completed successfully"
+
+  # テスト実行フェーズ: Playwright E2Eテスト
+  test:
+    commands:
+      - echo "Starting Playwright E2E tests..."
+      - echo "Running critical path tests with Chromium browser..."
+      - npx playwright test --project=chromium --reporter=html --reporter=json
+    finally:
+      - echo "Test execution completed"
+
+  # クリーンアップフェーズ: テストアーティファクトの収集
+  post_test:
+    commands:
+      - echo "Collecting test results and artifacts..."
+      - test -d playwright-report && zip -r test-results.zip playwright-report || echo "No test reports found"
+      - test -d test-results && zip -r test-results-json.zip test-results || echo "No JSON results found"
+
+# アーティファクト設定
+artifacts:
+  # HTMLレポート
+  - name: Playwright_HTML_Report
+    paths:
+      - playwright-report/**/*
+  # JSONレポート
+  - name: Playwright_JSON_Report
+    paths:
+      - test-results/**/*
+  # スクリーンショット
+  - name: Playwright_Screenshots
+    paths:
+      - test-results/screenshots/**/*
+  # トレース（デバッグ用）
+  - name: Playwright_Traces
+    paths:
+      - test-results/traces/**/*
+
+# テスト環境設定
+env:
+  variables:
+    # Playwrightのヘッドレスモード設定
+    PLAYWRIGHT_HEADLESS: "true"
+    # APIベースURL（テスト環境）
+    VITE_API_BASE_URL: "$API_BASE_URL"
+    # Cognito設定
+    VITE_COGNITO_USER_POOL_ID: "$COGNITO_USER_POOL_ID"
+    VITE_COGNITO_CLIENT_ID: "$COGNITO_CLIENT_ID"
+    # E2Eテストユーザー認証情報
+    E2E_TEST_USERNAME: "$E2E_TEST_USERNAME"
+    E2E_TEST_PASSWORD: "$E2E_TEST_PASSWORD"
+
+# テスト結果フォーマット
+reports:
+  - name: Playwright_Test_Report
+    format: JUnit
+    files:
+      - test-results/junit.xml

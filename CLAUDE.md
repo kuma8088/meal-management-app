@@ -257,19 +257,35 @@ pytest.iniで定義されているマーカー:
 
 ### E2Eテスト（フロントエンド）
 
-Playwrightを使用したE2Eテスト:
+**必須実装: AWS Device Farm 統合**
+
+Playwrightを使用したE2Eテスト + AWS Device Farm での実機テスト:
 - テストファイル: `frontend/e2e/`
+- クリティカルパステスト: `frontend/e2e/critical-path.spec.ts` (20テスト)
 - 設定: `frontend/playwright.config.ts`
 - 対象ブラウザ: Chromium, Firefox, Webkit
-- 自動的に開発サーバーを起動してテスト実行
+- Device Farm テスト仕様: `frontend/testspec.yml`
+- GitHub Actions ワークフロー: `.github/workflows/device-farm.yml`
 
 **テスト実行:**
 ```bash
 cd frontend
+
+# ローカル実行（Playwright）
 npm run test:e2e        # ヘッドレスモード
 npm run test:e2e:ui     # UIモード（デバッグに便利）
 npm run test:e2e:headed # ブラウザを表示して実行
+
+# Device Farm 実行（自動）
+# - PR を作成すると GitHub Actions で自動実行
+# - 毎週日曜日 9:00 UTC に定期実行
 ```
+
+**Device Farm 設定:**
+- リージョン: us-west-2 (Device Farm のサポートリージョン)
+- テスト環境: ローカル開発でも実機テストと同じテストを実行可能
+- CI/CD: GitHub Actions で自動化
+- 詳細ガイド: [docs/DEVICE_FARM_SETUP.md](docs/DEVICE_FARM_SETUP.md)
 
 ## セキュリティ考慮事項
 

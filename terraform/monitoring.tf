@@ -39,6 +39,7 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 resource "aws_cloudwatch_log_group" "line_handler" {
   name              = "/aws/lambda/${aws_lambda_function.line_handler.function_name}"
   retention_in_days = var.log_retention_days
+  skip_destroy      = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-line-handler-logs"
@@ -61,6 +62,7 @@ resource "aws_cloudwatch_log_group" "meal_registration" {
 resource "aws_cloudwatch_log_group" "goal_management" {
   name              = "/aws/lambda/${aws_lambda_function.goal_management.function_name}"
   retention_in_days = var.log_retention_days
+  skip_destroy      = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-goal-management-logs"

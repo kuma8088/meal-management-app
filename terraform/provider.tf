@@ -30,3 +30,6 @@ provider "aws" {
     }
   }
 }
+
+# AWS Account ID data source
+data "aws_caller_identity" "current" {}

@@ -163,6 +163,31 @@ resource "aws_iam_role_policy" "lambda_secrets_manager" {
   })
 }
 
+# Cognito Admin権限（テストユーザー管理用）
+resource "aws_iam_role_policy" "lambda_cognito_admin" {
+  name = "${var.project_name}-lambda-cognito-admin-${var.environment}"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:ListUsers",
+          "cognito-idp:AdminResetUserPassword"
+        ]
+        Resource = "arn:aws:cognito-idp:${var.aws_region}:*:userpool/*"
+      }
+    ]
+  })
+}
+
 # API Gateway実行ロール（Cognitoオーソライザー用）
 resource "aws_iam_role" "api_gateway_cloudwatch_role" {
   name = "${var.project_name}-api-gateway-cloudwatch-role-${var.environment}"

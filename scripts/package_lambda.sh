@@ -26,6 +26,8 @@ LAMBDA_FUNCTIONS=(
     "daily_summary"
     "user_profile_management"
     "food_master_import"
+    "weekly_report"
+    "test_user_management"
 )
 
 # 各Lambda関数をパッケージ化
