@@ -352,6 +352,45 @@ phases:
 
 ---
 
+## 問題11: 全テストが実行されてしまう（コスト増大）
+
+### 問題
+
+testspec.yml で以下のように設定すると、**全ての E2E テスト**が Device Farm で実行されてしまう：
+
+```yaml
+test:
+  commands:
+    - npx playwright test --project=chromium
+```
+
+8個のテストファイル × 複数デバイス = 65 ジョブが生成され、実行時間・コストが大幅に増大。
+
+### 原因
+
+`npx playwright test` はデフォルトで `e2e/` フォルダ内の全てのテストファイルを実行します。
+
+### 解決策
+
+Device Farm ではクリティカルパステストのみを実行するよう、特定のテストファイルを指定：
+
+```yaml
+# 誤り - 全テスト実行（8ファイル × 複数デバイス = 65ジョブ）
+- npx playwright test --project=chromium
+
+# 正しい - クリティカルパスのみ（1ファイル × 複数デバイス = 少数ジョブ）
+- npx playwright test e2e/critical-path.spec.ts --project=chromium
+```
+
+### ベストプラクティス
+
+| 環境 | 実行するテスト | 理由 |
+|-----|-------------|-----|
+| Device Farm | critical-path.spec.ts のみ | コスト最適化、実デバイス検証 |
+| GitHub Actions | 全テスト | 無料枠活用、高速実行 |
+
+---
+
 ## まとめ
 
 AWS Device Farm の API は、パラメータ名や値に細かい違いがあり、ドキュメントだけでは把握しにくい部分があります。主な注意点：
@@ -362,6 +401,7 @@ AWS Device Farm の API は、パラメータ名や値に細かい違いがあ�
 4. **テストタイプの選択** - "WEB" ではなく `APPIUM_WEB_NODE` など Appium ベースを使用
 5. **必要なアップロード** - テストパッケージとテストスペックの両方が必要
 6. **バージョン番号** - testspec.yml は `version: 0.1` を使用
+7. **テスト範囲** - クリティカルパスのみに限定してコスト最適化
 
 これらの落とし穴を避けることで、Device Farm を使用した CI/CD パイプラインを正しく構築できます。
 
