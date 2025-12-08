@@ -31,5 +31,20 @@ provider "aws" {
   }
 }
 
+# AWS Provider for Device Farm (us-west-2)
+provider "aws" {
+  alias  = "us_west_2"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      Project     = "meal-management-app"
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+      Region      = "us-west-2"
+    }
+  }
+}
+
 # AWS Account ID data source
 data "aws_caller_identity" "current" {}

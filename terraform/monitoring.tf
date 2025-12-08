@@ -51,6 +51,7 @@ resource "aws_cloudwatch_log_group" "line_handler" {
 resource "aws_cloudwatch_log_group" "meal_registration" {
   name              = "/aws/lambda/${aws_lambda_function.meal_registration.function_name}"
   retention_in_days = var.log_retention_days
+  skip_destroy      = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-meal-registration-logs"
@@ -74,6 +75,7 @@ resource "aws_cloudwatch_log_group" "goal_management" {
 resource "aws_cloudwatch_log_group" "daily_summary" {
   name              = "/aws/lambda/${aws_lambda_function.daily_summary.function_name}"
   retention_in_days = var.log_retention_days
+  skip_destroy      = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-daily-summary-logs"

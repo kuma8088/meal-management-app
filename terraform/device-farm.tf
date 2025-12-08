@@ -1,16 +1,16 @@
-# E2E Testing Infrastructure
-# Note: Device Farm is not available in the target region (ap-northeast-1/us-east-1)
-# E2E testing is performed using Playwright with GitHub Actions
+# E2E Testing Infrastructure with Device Farm Integration
+# Device Farm is only available in us-west-2
+# Main infrastructure (ap-northeast-1) can be accessed via public API endpoints
 #
-# This file is reserved for future Device Farm configuration if migrating to us-west-2
+# Architecture:
+# - ap-northeast-1: Lambda, API Gateway, DynamoDB (main application)
+# - us-west-2: Device Farm project, device pools (testing infrastructure)
+# - No VPC peering needed: Device Farm accesses public API Gateway endpoints
 
-# AWS Provider for Device Farm (temporary for state cleanup)
-provider "aws" {
-  alias  = "devicefarm"
-  region = "us-east-1"
-}
+# ============================================================================
+# S3 Bucket for Test Artifacts and Reports (ap-northeast-1)
+# ============================================================================
 
-# S3 Bucket for Test Artifacts and Reports
 resource "aws_s3_bucket" "test_artifacts" {
   bucket = "${var.project_name}-test-artifacts-${var.environment}"
 
@@ -67,8 +67,146 @@ resource "aws_s3_bucket_lifecycle_configuration" "test_artifacts" {
   }
 }
 
+# ============================================================================
+# Device Farm Resources (us-west-2)
+# ============================================================================
+
+# Device Farm Project
+resource "aws_devicefarm_project" "mealmgtsystem" {
+  name     = "${var.project_name}-e2e-tests-${var.environment}"
+  provider = aws.us_west_2
+
+  tags = {
+    Name        = "${var.project_name}-e2e-tests-${var.environment}"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# Device Pool: Android
+resource "aws_devicefarm_device_pool" "android" {
+  name        = "${var.project_name}-android-pool-${var.environment}"
+  project_arn = aws_devicefarm_project.mealmgtsystem.arn
+  provider    = aws.us_west_2
+
+  rule {
+    attribute = "OS_VERSION"
+    operator  = "GREATER_THAN_OR_EQUALS"
+    value     = "\"11\""
+  }
+
+  rule {
+    attribute = "MANUFACTURER"
+    operator  = "EQUALS"
+    value     = "\"Samsung\""
+  }
+
+  tags = {
+    Name        = "${var.project_name}-android-pool-${var.environment}"
+    Environment = var.environment
+    DeviceType  = "Android"
+  }
+}
+
+# Device Pool: iOS
+resource "aws_devicefarm_device_pool" "ios" {
+  name        = "${var.project_name}-ios-pool-${var.environment}"
+  project_arn = aws_devicefarm_project.mealmgtsystem.arn
+  provider    = aws.us_west_2
+
+  rule {
+    attribute = "OS_VERSION"
+    operator  = "GREATER_THAN_OR_EQUALS"
+    value     = "\"15\""
+  }
+
+  rule {
+    attribute = "MANUFACTURER"
+    operator  = "EQUALS"
+    value     = "\"Apple\""
+  }
+
+  tags = {
+    Name        = "${var.project_name}-ios-pool-${var.environment}"
+    Environment = var.environment
+    DeviceType  = "iOS"
+  }
+}
+
+# ============================================================================
+# IAM Role for Device Farm (us-west-2)
+# ============================================================================
+
+resource "aws_iam_role" "device_farm" {
+  name_prefix = "${var.project_name}-device-farm-"
+  provider    = aws.us_west_2
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "devicefarm.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-device-farm-role-${var.environment}"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# IAM Policy for Device Farm: S3 access
+resource "aws_iam_role_policy" "device_farm_s3" {
+  name_prefix = "${var.project_name}-device-farm-s3-"
+  role        = aws_iam_role.device_farm.id
+  provider    = aws.us_west_2
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          aws_s3_bucket.test_artifacts.arn,
+          "${aws_s3_bucket.test_artifacts.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+# ============================================================================
 # Outputs
+# ============================================================================
+
 output "test_artifacts_bucket" {
   description = "S3 Bucket for test artifacts and reports"
   value       = aws_s3_bucket.test_artifacts.id
+}
+
+output "device_farm_project_arn" {
+  description = "Device Farm Project ARN"
+  value       = aws_devicefarm_project.mealmgtsystem.arn
+}
+
+output "device_farm_android_pool_arn" {
+  description = "Device Farm Android Device Pool ARN"
+  value       = aws_devicefarm_device_pool.android.arn
+}
+
+output "device_farm_ios_pool_arn" {
+  description = "Device Farm iOS Device Pool ARN"
+  value       = aws_devicefarm_device_pool.ios.arn
 }
