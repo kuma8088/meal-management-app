@@ -54,13 +54,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Get Device Farm Project ARN
+        id: project
+        run: |
+          # Get project ARN from project name
+          PROJECT_ARN=$(aws devicefarm list-projects \
+            --query "projects[?name=='${{ env.DEVICEFARM_PROJECT_NAME }}'].arn" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "project_arn=$PROJECT_ARN" >> $GITHUB_OUTPUT
+          echo "Project ARN: $PROJECT_ARN"
+
       - name: Upload testspec to Device Farm
         id: upload
         working-directory: ./frontend
         run: |
           # Create upload for test specification
           TESTSPEC_UPLOAD_ARN=$(aws devicefarm create-upload \
-            --project-arn "arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:project:${{ env.DEVICEFARM_PROJECT_NAME }}" \
+            --project-arn "${{ steps.project.outputs.project_arn }}" \
             --name "testspec-$(date +%s).yml" \
             --type "APPIUM_PYTHON_TEST_PACKAGE" \
             --query 'upload.arn' \
@@ -71,7 +83,7 @@ jobs:
 
           # Upload test specification file
           UPLOAD_URL=$(aws devicefarm get-upload \
-            --project-arn "arn:aws:devicefarm:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:project:${{ env.DEVICEFARM_PROJECT_NAME }}" \
+            --project-arn "${{ steps.project.outputs.project_arn }}" \
             --arn "$TESTSPEC_UPLOAD_ARN" \
             --query 'upload.url' \
             --output text)
@@ -105,7 +117,8 @@ jobs:
           # Get project ARN
           PROJECT_ARN=$(aws devicefarm list-projects \
             --query "projects[?name=='${{ env.DEVICEFARM_PROJECT_NAME }}'].arn" \
-            --output text)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
           echo "project_arn=$PROJECT_ARN" >> $GITHUB_OUTPUT
           echo "Project ARN: $PROJECT_ARN"
