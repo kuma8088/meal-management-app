@@ -150,7 +150,7 @@ jobs:
           TEST_RUN_ARN=$(aws devicefarm schedule-run \
             --project-arn "$PROJECT_ARN" \
             --device-pool-arn "$DEVICE_POOL_ARN" \
-            --test "{\"type\":\"WEB\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
+            --test "{\"type\":\"APPIUM_WEB_NODE\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
             --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoCapture":true}' \
             --query 'testRun.arn' \
             --output text \
