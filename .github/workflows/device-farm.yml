@@ -26,7 +26,9 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      testspec-upload-arn: ${{ steps.upload.outputs.testspec_upload_arn }}
+      testpackage-upload-arn: ${{ steps.upload-package.outputs.testpackage_upload_arn }}
+      testspec-upload-arn: ${{ steps.upload-spec.outputs.testspec_upload_arn }}
+      project-arn: ${{ steps.project.outputs.project_arn }}
 
     steps:
       - name: Checkout code
@@ -43,9 +45,9 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Build production bundle
+      - name: Install Playwright browsers
         working-directory: ./frontend
-        run: npm run build
+        run: npx playwright install chromium --with-deps
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -66,40 +68,125 @@ jobs:
           echo "project_arn=$PROJECT_ARN" >> $GITHUB_OUTPUT
           echo "Project ARN: $PROJECT_ARN"
 
+      - name: Create test package ZIP
+        working-directory: ./frontend
+        run: |
+          # Create a ZIP file containing the test code
+          # Include: e2e tests, package.json, node_modules, playwright config
+          mkdir -p test-package
+          cp -r e2e test-package/
+          cp package.json test-package/
+          cp package-lock.json test-package/
+          cp playwright.config.ts test-package/
+          cp tsconfig.json test-package/
+          cp -r node_modules test-package/
+
+          cd test-package
+          zip -r ../test-package.zip .
+          cd ..
+
+          echo "Test package created:"
+          ls -lh test-package.zip
+
+      - name: Upload test package to Device Farm
+        id: upload-package
+        working-directory: ./frontend
+        run: |
+          # Create upload for test package
+          UPLOAD_RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ steps.project.outputs.project_arn }}" \
+            --name "test-package-$(date +%s).zip" \
+            --type "APPIUM_WEB_NODE_TEST_PACKAGE" \
+            --region ${{ env.AWS_REGION }})
+
+          TESTPACKAGE_UPLOAD_ARN=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload.arn')
+          UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload.url')
+
+          echo "testpackage_upload_arn=$TESTPACKAGE_UPLOAD_ARN" >> $GITHUB_OUTPUT
+          echo "Test Package Upload ARN: $TESTPACKAGE_UPLOAD_ARN"
+
+          # Upload the test package ZIP
+          curl -X PUT "$UPLOAD_URL" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@test-package.zip"
+
+          # Wait for upload to complete
+          echo "Waiting for upload to be processed..."
+          for i in {1..30}; do
+            STATUS=$(aws devicefarm get-upload \
+              --arn "$TESTPACKAGE_UPLOAD_ARN" \
+              --query 'upload.status' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            echo "Upload status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEEDED" ]; then
+              echo "Test package upload succeeded!"
+              break
+            elif [ "$STATUS" = "FAILED" ]; then
+              echo "Test package upload failed!"
+              aws devicefarm get-upload --arn "$TESTPACKAGE_UPLOAD_ARN" --region ${{ env.AWS_REGION }}
+              exit 1
+            fi
+
+            sleep 10
+          done
+
       - name: Upload testspec to Device Farm
-        id: upload
+        id: upload-spec
         working-directory: ./frontend
         run: |
           # Create upload for test specification
-          TESTSPEC_UPLOAD_ARN=$(aws devicefarm create-upload \
+          UPLOAD_RESPONSE=$(aws devicefarm create-upload \
             --project-arn "${{ steps.project.outputs.project_arn }}" \
             --name "testspec-$(date +%s).yml" \
             --type "APPIUM_WEB_NODE_TEST_SPEC" \
-            --query 'upload.arn' \
-            --output text \
             --region ${{ env.AWS_REGION }})
+
+          TESTSPEC_UPLOAD_ARN=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload.arn')
+          UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload.url')
 
           echo "testspec_upload_arn=$TESTSPEC_UPLOAD_ARN" >> $GITHUB_OUTPUT
           echo "Test Spec Upload ARN: $TESTSPEC_UPLOAD_ARN"
 
-          # Get upload URL (get-upload only takes --arn, not --project-arn)
-          UPLOAD_URL=$(aws devicefarm get-upload \
-            --arn "$TESTSPEC_UPLOAD_ARN" \
-            --query 'upload.url' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
+          # Upload the testspec YAML
+          curl -X PUT "$UPLOAD_URL" \
+            -H "Content-Type: text/yaml" \
+            --data-binary "@testspec.yml"
 
-          curl -X PUT "$UPLOAD_URL" --data-binary "@testspec.yml" || echo "Test spec upload completed"
+          # Wait for upload to complete
+          echo "Waiting for upload to be processed..."
+          for i in {1..30}; do
+            STATUS=$(aws devicefarm get-upload \
+              --arn "$TESTSPEC_UPLOAD_ARN" \
+              --query 'upload.status' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+
+            echo "Upload status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEEDED" ]; then
+              echo "Test spec upload succeeded!"
+              break
+            elif [ "$STATUS" = "FAILED" ]; then
+              echo "Test spec upload failed!"
+              aws devicefarm get-upload --arn "$TESTSPEC_UPLOAD_ARN" --region ${{ env.AWS_REGION }}
+              exit 1
+            fi
+
+            sleep 5
+          done
 
   run-tests:
     name: Run E2E Tests on Device Farm
     runs-on: ubuntu-latest
     needs: build-and-upload
-    if: always()
 
     strategy:
       matrix:
         device-pool: [android, ios]
+      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -115,12 +202,7 @@ jobs:
       - name: Get Device Pool ARN - ${{ matrix.device-pool }}
         id: get-pool
         run: |
-          # Get project ARN
-          PROJECT_ARN=$(aws devicefarm list-projects \
-            --query "projects[?name=='${{ env.DEVICEFARM_PROJECT_NAME }}'].arn" \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-
+          PROJECT_ARN="${{ needs.build-and-upload.outputs.project-arn }}"
           echo "project_arn=$PROJECT_ARN" >> $GITHUB_OUTPUT
           echo "Project ARN: $PROJECT_ARN"
 
@@ -143,16 +225,23 @@ jobs:
       - name: Create test run - ${{ matrix.device-pool }}
         id: test-run
         run: |
-          PROJECT_ARN="${{ steps.get-pool.outputs.project_arn }}"
+          PROJECT_ARN="${{ needs.build-and-upload.outputs.project-arn }}"
           DEVICE_POOL_ARN="${{ steps.get-pool.outputs.pool_arn }}"
+          TESTPACKAGE_ARN="${{ needs.build-and-upload.outputs.testpackage-upload-arn }}"
           TESTSPEC_ARN="${{ needs.build-and-upload.outputs.testspec-upload-arn }}"
+
+          echo "Scheduling test run with:"
+          echo "  Project ARN: $PROJECT_ARN"
+          echo "  Device Pool ARN: $DEVICE_POOL_ARN"
+          echo "  Test Package ARN: $TESTPACKAGE_ARN"
+          echo "  Test Spec ARN: $TESTSPEC_ARN"
 
           TEST_RUN_ARN=$(aws devicefarm schedule-run \
             --project-arn "$PROJECT_ARN" \
             --device-pool-arn "$DEVICE_POOL_ARN" \
-            --test "{\"type\":\"APPIUM_WEB_NODE\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
+            --test "{\"type\":\"APPIUM_WEB_NODE\",\"testPackageArn\":\"$TESTPACKAGE_ARN\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
             --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoCapture":true}' \
-            --query 'testRun.arn' \
+            --query 'run.arn' \
             --output text \
             --region ${{ env.AWS_REGION }})
 
@@ -171,7 +260,8 @@ jobs:
             STATUS=$(aws devicefarm get-run \
               --arn "$TEST_RUN_ARN" \
               --query 'run.status' \
-              --output text)
+              --output text \
+              --region ${{ env.AWS_REGION }})
 
             echo "Test run status: $STATUS (Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)"
 
@@ -179,7 +269,8 @@ jobs:
               RESULT=$(aws devicefarm get-run \
                 --arn "$TEST_RUN_ARN" \
                 --query 'run.result' \
-                --output text)
+                --output text \
+                --region ${{ env.AWS_REGION }})
 
               echo "Test result: $RESULT"
               echo "test_result=$RESULT" >> $GITHUB_OUTPUT
@@ -200,13 +291,18 @@ jobs:
         run: |
           TEST_RUN_ARN="${{ steps.test-run.outputs.test_run_arn }}"
 
+          if [ -z "$TEST_RUN_ARN" ]; then
+            echo "No test run ARN available, skipping artifact download"
+            exit 0
+          fi
+
           aws devicefarm list-artifacts \
             --arn "$TEST_RUN_ARN" \
             --type "LOG" \
             --query 'artifacts[*].[name,url]' \
             --output text \
             --region ${{ env.AWS_REGION }} | while read name url; do
-              if [ ! -z "$name" ]; then
+              if [ ! -z "$name" ] && [ ! -z "$url" ]; then
                 echo "Downloading artifact: $name"
                 curl -o "$name" "$url" 2>/dev/null || echo "Failed to download $name"
               fi
@@ -222,6 +318,7 @@ jobs:
             *.json
             *.log
           retention-days: 30
+          if-no-files-found: ignore
 
   report-results:
     name: Report Test Results
@@ -235,6 +332,7 @@ jobs:
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
 
       - name: Generate test report summary
         run: |
