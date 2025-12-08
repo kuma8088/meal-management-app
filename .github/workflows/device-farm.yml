@@ -149,11 +149,11 @@ jobs:
           TEST_RUN_ARN=$(aws devicefarm schedule-run \
             --project-arn "$PROJECT_ARN" \
             --device-pool-arn "$DEVICE_POOL_ARN" \
-            --test-type "WEB" \
-            --test-spec-arn "$TESTSPEC_ARN" \
+            --test "{\"type\":\"WEB\",\"testSpecArn\":\"$TESTSPEC_ARN\"}" \
             --execution-configuration '{"accountsCleanup":true,"appPackagesCleanup":true,"videoRecording":true}' \
             --query 'testRun.arn' \
-            --output text)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
           echo "test_run_arn=$TEST_RUN_ARN" >> $GITHUB_OUTPUT
           echo "Test Run ARN: $TEST_RUN_ARN"
@@ -201,9 +201,10 @@ jobs:
 
           aws devicefarm list-artifacts \
             --arn "$TEST_RUN_ARN" \
-            --artifact-type "LOG" \
+            --type "LOG" \
             --query 'artifacts[*].[name,url]' \
-            --output text | while read name url; do
+            --output text \
+            --region ${{ env.AWS_REGION }} | while read name url; do
               if [ ! -z "$name" ]; then
                 echo "Downloading artifact: $name"
                 curl -o "$name" "$url" 2>/dev/null || echo "Failed to download $name"
