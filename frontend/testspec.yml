@@ -1,4 +1,4 @@
-version: 0.0
+version: 0.1
 
 # Device Farm Test Specification for Meal Management App
 # Playwright E2E テストをDevice Farm上で実行する構成
