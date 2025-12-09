@@ -84,12 +84,13 @@ resource "aws_devicefarm_project" "mealmgtsystem" {
 }
 
 # Device Pool: Android
-# max_devices = 1 for cost optimization (1 device per test run)
+# max_devices = 5 to allow Device Farm to pick from available devices
+# Cost optimization is handled by account-level concurrency (default: 5)
 resource "aws_devicefarm_device_pool" "android" {
   name        = "${var.project_name}-android-pool-${var.environment}"
   project_arn = aws_devicefarm_project.mealmgtsystem.arn
   provider    = aws.us_west_2
-  max_devices = 1
+  max_devices = 5
 
   # Use PLATFORM instead of MANUFACTURER for better APPIUM_WEB_NODE compatibility
   rule {
@@ -112,12 +113,13 @@ resource "aws_devicefarm_device_pool" "android" {
 }
 
 # Device Pool: iOS
-# max_devices = 1 for cost optimization (1 device per test run)
+# max_devices = 5 to allow Device Farm to pick from available devices
+# Cost optimization is handled by account-level concurrency (default: 5)
 resource "aws_devicefarm_device_pool" "ios" {
   name        = "${var.project_name}-ios-pool-${var.environment}"
   project_arn = aws_devicefarm_project.mealmgtsystem.arn
   provider    = aws.us_west_2
-  max_devices = 1
+  max_devices = 5
 
   rule {
     attribute = "PLATFORM"
