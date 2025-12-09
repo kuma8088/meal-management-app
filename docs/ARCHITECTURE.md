@@ -171,6 +171,26 @@ meal-management-app/
 
 - CloudWatch Logs へのログ出力権限
 
+#### Lambda 間呼び出し権限
+
+LINE Handler から他の Lambda 関数を呼び出すための権限:
+
+- **対象関数**: `${project_name}-${environment}-*` パターンにマッチする全関数
+- **アクション**: `lambda:InvokeFunction`
+- **用途**: LINE Bot → Daily Summary（総評機能）など
+
+```hcl
+# 許可されるリソースパターン
+Resource = "arn:aws:lambda:${region}:*:function:${project}-${env}-*"
+```
+
+**重要**: Lambda 関数名は Terraform で動的に生成されるため、ハードコードせず環境変数で渡す必要がある。
+
+| 呼び出し元 | 呼び出し先 | 環境変数 |
+|------------|------------|----------|
+| line_handler | daily_summary | `DAILY_SUMMARY_FUNCTION_NAME` |
+| line_handler | food_search | `FOOD_SEARCH_FUNCTION_NAME` |
+
 ## セキュリティ設定
 
 - すべての S3 バケットで暗号化を有効化

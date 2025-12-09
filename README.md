@@ -95,7 +95,9 @@ terraform apply
 - S3 バケット（terraform-state, barcode-images, frontend）
   - 食品マスタは DynamoDB をプライマリ使用（要求ベース課金で効率的）
 - Cognito User Pool と User Pool Client
-- Lambda 実行用 IAM ロール（DynamoDB、S3、Bedrock、Rekognition へのアクセス権限付き）
+- Lambda 実行用 IAM ロール
+  - DynamoDB、S3、Bedrock、Rekognition へのアクセス権限
+  - **Lambda 間呼び出し権限**: LINE Handler → Daily Summary 等
 - API Gateway CloudWatch ロール
 
 ### 4. Python 依存関係のインストール
@@ -192,6 +194,22 @@ terraform apply
 - `VITE_COGNITO_USER_POOL_ID`: Cognito User Pool ID
 - `VITE_COGNITO_CLIENT_ID`: Cognito Client ID
 
+## LINE Bot アーキテクチャ
+
+LINE Bot は以下の Lambda 関数連携で動作します：
+
+```
+LINE App → API Gateway → line_handler → daily_summary (総評機能)
+                                      → food_search (食品検索)
+```
+
+**重要な設計ポイント:**
+- Lambda 関数名は Terraform で動的生成（`${project}-${env}-${name}` 形式）
+- 関数名はハードコードせず、環境変数で渡す
+- Lambda 間呼び出しには IAM の `lambda:InvokeFunction` 権限が必要
+
+詳細は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照。
+
 ## ドキュメント
 
 詳細な設計書と要件定義書は `.kiro/specs/meal-management-app/` ディレクトリを参照してください。
@@ -199,6 +217,9 @@ terraform apply
 - [要件定義書](.kiro/specs/meal-management-app/requirements.md)
 - [設計書](.kiro/specs/meal-management-app/design.md)
 - [実装計画](.kiro/specs/meal-management-app/tasks.md)
+- [アーキテクチャ](docs/ARCHITECTURE.md)
+- [デプロイ手順](docs/DEPLOYMENT.md)
+- [ユーザーテストガイド](docs/USER_TEST_GUIDE.md)
 - [フロントエンド開発ガイド](frontend/README.md)
 - [プロジェクトガイド（Claude Code用）](CLAUDE.md)
 

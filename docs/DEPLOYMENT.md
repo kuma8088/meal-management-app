@@ -132,3 +132,39 @@ aws logs tail /aws/lambda/meal-management-app-food-search-dev --follow
 # ユーザー確認
 aws cognito-idp list-users --user-pool-id ap-northeast-1_fmIO9wUwC
 ```
+
+### Lambda 間呼び出しエラー (AccessDeniedException)
+
+LINE Bot の総評機能などで `AccessDeniedException` が発生する場合:
+
+**症状:**
+```
+User: arn:aws:sts::ACCOUNT:assumed-role/...-lambda-execution-role-dev/...-line-handler
+is not authorized to perform: lambda:InvokeFunction on resource: ...
+```
+
+**原因:**
+1. IAM ロールに `lambda:InvokeFunction` 権限がない
+2. 呼び出し先の Lambda 関数名が間違っている（ハードコード）
+
+**解決方法:**
+
+1. IAM 権限の確認:
+```bash
+aws iam list-role-policies --role-name meal-management-app-lambda-execution-role-dev
+# lambda-invoke-lambda ポリシーが存在することを確認
+```
+
+2. 環境変数の確認:
+```bash
+aws lambda get-function-configuration \
+  --function-name meal-management-app-dev-line-handler \
+  --query 'Environment.Variables'
+# DAILY_SUMMARY_FUNCTION_NAME が正しく設定されていることを確認
+```
+
+3. Terraform での修正:
+- `terraform/iam.tf`: `aws_iam_role_policy.lambda_invoke_lambda` リソースを追加
+- `terraform/api_gateway.tf`: Lambda 環境変数に関数名を追加
+
+**重要**: Lambda 関数名は `${project}-${env}-${name}` 形式で動的生成されるため、ハードコードせず環境変数で渡す。
