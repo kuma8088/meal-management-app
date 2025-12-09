@@ -188,10 +188,10 @@ def check_usage_limit(user_id: str, advice_date: date) -> tuple[bool, int]:
     要件: 10.2
     プロパティ: 20
     """
-    usage_key = f"{user_id}#{advice_date.isoformat()}"
+    user_id_date = f"{user_id}#{advice_date.isoformat()}"
 
     try:
-        usage_item = advice_usage_db.get_item({"usage_key": usage_key})
+        usage_item = advice_usage_db.get_item({"user_id_date": user_id_date})
         usage_count = int(usage_item.get("usage_count", 0))
 
         # 制限チェック
@@ -226,11 +226,11 @@ def aggregate_daily_meals(user_id: str, advice_date: date) -> Dict[str, float]:
     start_timestamp = start_datetime.isoformat()
     end_timestamp = end_datetime.isoformat()
 
-    # GSI1でユーザーの食事記録をクエリ
+    # UserIdTimestampIndex GSIでユーザーの食事記録をクエリ
     try:
         # DynamoDBのquery操作
         response = meals_db.table.query(
-            IndexName="GSI1",
+            IndexName="UserIdTimestampIndex",
             KeyConditionExpression="user_id = :user_id AND #ts BETWEEN :start AND :end",
             ExpressionAttributeNames={
                 "#ts": "timestamp"
@@ -280,9 +280,9 @@ def get_user_target_calories(user_id: str) -> float:
     要件: 10.5
     """
     try:
-        # GSI1でユーザーの最新の目標を取得
+        # UserIdCreatedAtIndex GSIでユーザーの最新の目標を取得
         response = goals_db.table.query(
-            IndexName="GSI1",
+            IndexName="UserIdCreatedAtIndex",
             KeyConditionExpression="user_id = :user_id",
             ExpressionAttributeValues={
                 ":user_id": user_id
@@ -423,7 +423,7 @@ def increment_usage_count(user_id: str, advice_date: date) -> None:
 
     要件: 10.8, 10.9
     """
-    usage_key = f"{user_id}#{advice_date.isoformat()}"
+    user_id_date = f"{user_id}#{advice_date.isoformat()}"
 
     # TTLを計算 (30日後)
     ttl_timestamp = int((datetime.now() + timedelta(days=ADVICE_USAGE_TTL_DAYS)).timestamp())
@@ -431,7 +431,7 @@ def increment_usage_count(user_id: str, advice_date: date) -> None:
     try:
         # カウンターをインクリメント
         advice_usage_db.table.update_item(
-            Key={"usage_key": usage_key},
+            Key={"user_id_date": user_id_date},
             UpdateExpression="SET usage_count = if_not_exists(usage_count, :zero) + :inc, #ttl = :ttl, user_id = :user_id, #date = :date",
             ExpressionAttributeNames={
                 "#ttl": "ttl",
@@ -446,7 +446,7 @@ def increment_usage_count(user_id: str, advice_date: date) -> None:
             }
         )
 
-        logger.info(f"Usage count incremented for {usage_key}")
+        logger.info(f"Usage count incremented for {user_id_date}")
 
     except ClientError as e:
         logger.error(f"Error incrementing usage count: {str(e)}")
