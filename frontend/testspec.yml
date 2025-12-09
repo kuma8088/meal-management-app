@@ -5,7 +5,7 @@ version: 0.1
 
 # Android/iOS デバイスのテストホスト指定（必須）
 android_test_host: amazon_linux_2
-ios_test_host: mac_os_sonoma
+ios_test_host: macos_sequoia
 
 phases:
   # 準備フェーズ: アプリケーションのビルドと依存関係のインストール
