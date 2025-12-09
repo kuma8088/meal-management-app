@@ -3,6 +3,10 @@ version: 0.1
 # Device Farm Test Specification for Meal Management App
 # Playwright E2E テストをDevice Farm上で実行する構成
 
+# Android デバイスには Amazon Linux 2 テストホストが必要
+configuration:
+  testHostType: "amazon_linux_2"
+
 phases:
   # 準備フェーズ: アプリケーションのビルドと依存関係のインストール
   pre_test:
