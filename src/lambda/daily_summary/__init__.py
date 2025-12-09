@@ -297,8 +297,14 @@ def get_user_target_calories(user_id: str) -> float:
             return float(goals[0].get("target_calories", 0))
         else:
             # 目標が設定されていない場合は、ユーザーのTDEEを返す
-            user_data = users_db.get_item({"user_id": user_id})
-            return float(user_data.get("tdee", 2000.0))
+            try:
+                user_data = users_db.get_item({"user_id": user_id})
+                if user_data:
+                    return float(user_data.get("tdee", 2000.0))
+            except Exception:
+                pass
+            # ユーザーデータが見つからない場合はデフォルト値
+            return 2000.0
 
     except (ResourceNotFoundError, ClientError) as e:
         logger.warning(f"Could not get target calories for user {user_id}: {str(e)}")
