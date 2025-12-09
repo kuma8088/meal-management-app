@@ -479,6 +479,83 @@ resource "aws_devicefarm_device_pool" "android" {
 
 ---
 
+## 問題14: Android デバイスが全て SKIPPED になる（Amazon Linux 2 必須）
+
+### 問題
+
+APPIUM_WEB_NODE テストで Android デバイスを使用しようとすると、全デバイスが SKIPPED になる：
+
+```json
+{
+  "result": "SKIPPED",
+  "message": "{\"skippedDevices\":[{\"Samsung Galaxy A25\":[\"Android devices require a test spec file which has selected the Amazon Linux 2 test host\"]}...}"
+}
+```
+
+### 原因
+
+APPIUM_WEB_NODE テストタイプで Android デバイスを使用するには、testspec.yml で Amazon Linux 2 テストホストを**トップレベル**で明示的に指定する必要があります。
+
+**注意**: `configuration.testHostType` は Device Farm では認識されません。
+
+### 解決策
+
+testspec.yml の**トップレベル**に `android_test_host` と `ios_test_host` を追加：
+
+```yaml
+version: 0.1
+
+# テストホスト指定（トップレベルに配置 - 必須）
+android_test_host: amazon_linux_2
+ios_test_host: macos_sequoia  # 注: mac_os_sonoma は無効
+
+phases:
+  pre_test:
+    commands:
+      - npm ci
+      - npx playwright install chromium
+  test:
+    commands:
+      - npx playwright test e2e/smoke-test.spec.ts --project=chromium
+```
+
+参考: [AWS Device Farm - Amazon Linux 2 Test Spec Example](https://docs.aws.amazon.com/devicefarm/latest/developerguide/amazon-linux-2-test-spec-file-example.html)
+
+---
+
+## 問題15: iOS デバイスが全て SKIPPED になる（無効なテストホスト名）
+
+### 問題
+
+iOS テストでデバイスが SKIPPED になり、以下のエラーメッセージが表示される：
+
+```json
+{
+  "result": "SKIPPED",
+  "message": "{\"skippedDevices\":[{\"Apple iPhone 13\":[\"The selected test host 'mac_os_sonoma' is not valid\"]}...]}"
+}
+```
+
+### 原因
+
+`ios_test_host` に無効な値 `mac_os_sonoma` を指定していた。Device Farm で有効な iOS テストホスト名は `macos_sequoia` です。
+
+### 解決策
+
+testspec.yml の `ios_test_host` を正しい値に修正：
+
+```yaml
+# 誤り - 無効なテストホスト名
+ios_test_host: mac_os_sonoma
+
+# 正しい - 有効なテストホスト名
+ios_test_host: macos_sequoia
+```
+
+参考: [AWS Device Farm - Test environment for iOS devices](https://docs.aws.amazon.com/devicefarm/latest/developerguide/custom-test-environments-hosts-ios.html)
+
+---
+
 ## まとめ
 
 AWS Device Farm の API は、パラメータ名や値に細かい違いがあり、ドキュメントだけでは把握しにくい部分があります。主な注意点：
@@ -492,6 +569,8 @@ AWS Device Farm の API は、パラメータ名や値に細かい違いがあ�
 7. **テスト範囲** - クリティカルパスのみに限定してコスト最適化
 8. **デバイス数制限** - `max_devices = 1` でコスト最適化
 9. **PLATFORM 属性** - MANUFACTURER より PLATFORM を使用して互換性向上
+10. **Amazon Linux 2** - Android デバイスには `android_test_host: amazon_linux_2` が必須
+11. **macOS Sequoia** - iOS デバイスには `ios_test_host: macos_sequoia` を使用（`mac_os_sonoma` は無効）
 
 これらの落とし穴を避けることで、Device Farm を使用した CI/CD パイプラインを正しく構築できます。
 
