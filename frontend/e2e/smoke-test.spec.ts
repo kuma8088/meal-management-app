@@ -17,8 +17,9 @@ test.describe('【Smoke Test】基本動作確認', () => {
   test('1. ホームページが正しく表示される', async ({ page }) => {
     await page.goto('/');
 
-    // ホームページの基本要素を確認（未認証時はログインページにリダイレクト）
+    // ホームページの基本要素を確認
     await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('nav')).toBeVisible();
   });
 
   test('2. 食事登録ページにアクセスできる', async ({ page }) => {

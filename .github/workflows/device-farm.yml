@@ -72,14 +72,16 @@ jobs:
         working-directory: ./frontend
         run: |
           # Create a ZIP file containing the test code
-          # Include: e2e tests, package.json, node_modules, playwright configs
+          # Include: e2e tests, package.json, node_modules, playwright config
           mkdir -p test-package
           cp -r e2e test-package/
           cp package.json test-package/
           cp package-lock.json test-package/
           cp playwright.config.ts test-package/
-          cp playwright.devicefarm.config.ts test-package/
           cp tsconfig.json test-package/
+          cp tsconfig.app.json test-package/
+          cp tsconfig.node.json test-package/
+          cp -r tests test-package/
           cp -r node_modules test-package/
 
           cd test-package
