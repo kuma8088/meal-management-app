@@ -163,6 +163,25 @@ resource "aws_iam_role_policy" "lambda_secrets_manager" {
   })
 }
 
+# Lambda間呼び出し権限（LINE Handler → Daily Summary など）
+resource "aws_iam_role_policy" "lambda_invoke_lambda" {
+  name = "${var.project_name}-lambda-invoke-lambda-${var.environment}"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = "arn:aws:lambda:${var.aws_region}:*:function:${var.project_name}-${var.environment}-*"
+      }
+    ]
+  })
+}
+
 # Cognito Admin権限（テストユーザー管理用）
 resource "aws_iam_role_policy" "lambda_cognito_admin" {
   name = "${var.project_name}-lambda-cognito-admin-${var.environment}"

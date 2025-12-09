@@ -36,6 +36,7 @@ logger = get_logger(__name__)
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply"
+DAILY_SUMMARY_FUNCTION_NAME = os.environ.get("DAILY_SUMMARY_FUNCTION_NAME", "")
 
 # Lambda clients (他のLambda関数を呼び出す)
 lambda_client = boto3.client("lambda")
@@ -345,7 +346,7 @@ def handle_daily_advice_request(line_user_id: str, reply_token: str) -> None:
 
         # Lambda関数を同期的に呼び出し
         response = lambda_client.invoke(
-            FunctionName="daily_summary",  # TODO: 環境変数から取得
+            FunctionName=DAILY_SUMMARY_FUNCTION_NAME,
             InvocationType="RequestResponse",
             Payload=json.dumps(payload)
         )

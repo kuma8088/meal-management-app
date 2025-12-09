@@ -81,13 +81,14 @@ resource "aws_lambda_function" "line_handler" {
 
   environment {
     variables = {
-      LINE_CHANNEL_SECRET       = var.line_channel_secret
-      LINE_CHANNEL_ACCESS_TOKEN = var.line_channel_access_token
-      MEALS_TABLE_NAME          = aws_dynamodb_table.meals.name
-      USERS_TABLE_NAME          = aws_dynamodb_table.users.name
-      GOALS_TABLE_NAME          = aws_dynamodb_table.goals.name
-      ADVICE_USAGE_TABLE_NAME   = aws_dynamodb_table.advice_usage.name
-      FOODS_TABLE_NAME          = aws_dynamodb_table.foods.name
+      LINE_CHANNEL_SECRET         = var.line_channel_secret
+      LINE_CHANNEL_ACCESS_TOKEN   = var.line_channel_access_token
+      MEALS_TABLE_NAME            = aws_dynamodb_table.meals.name
+      USERS_TABLE_NAME            = aws_dynamodb_table.users.name
+      GOALS_TABLE_NAME            = aws_dynamodb_table.goals.name
+      ADVICE_USAGE_TABLE_NAME     = aws_dynamodb_table.advice_usage.name
+      FOODS_TABLE_NAME            = aws_dynamodb_table.foods.name
+      DAILY_SUMMARY_FUNCTION_NAME = aws_lambda_function.daily_summary.function_name
     }
   }
 
