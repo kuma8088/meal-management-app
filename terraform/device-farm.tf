@@ -84,21 +84,24 @@ resource "aws_devicefarm_project" "mealmgtsystem" {
 }
 
 # Device Pool: Android
+# max_devices = 1 for cost optimization (1 device per test run)
 resource "aws_devicefarm_device_pool" "android" {
   name        = "${var.project_name}-android-pool-${var.environment}"
   project_arn = aws_devicefarm_project.mealmgtsystem.arn
   provider    = aws.us_west_2
+  max_devices = 1
+
+  # Use PLATFORM instead of MANUFACTURER for better APPIUM_WEB_NODE compatibility
+  rule {
+    attribute = "PLATFORM"
+    operator  = "EQUALS"
+    value     = "\"ANDROID\""
+  }
 
   rule {
     attribute = "OS_VERSION"
     operator  = "GREATER_THAN_OR_EQUALS"
     value     = "\"11\""
-  }
-
-  rule {
-    attribute = "MANUFACTURER"
-    operator  = "EQUALS"
-    value     = "\"Samsung\""
   }
 
   tags = {
@@ -109,21 +112,23 @@ resource "aws_devicefarm_device_pool" "android" {
 }
 
 # Device Pool: iOS
+# max_devices = 1 for cost optimization (1 device per test run)
 resource "aws_devicefarm_device_pool" "ios" {
   name        = "${var.project_name}-ios-pool-${var.environment}"
   project_arn = aws_devicefarm_project.mealmgtsystem.arn
   provider    = aws.us_west_2
+  max_devices = 1
+
+  rule {
+    attribute = "PLATFORM"
+    operator  = "EQUALS"
+    value     = "\"IOS\""
+  }
 
   rule {
     attribute = "OS_VERSION"
     operator  = "GREATER_THAN_OR_EQUALS"
     value     = "\"15\""
-  }
-
-  rule {
-    attribute = "MANUFACTURER"
-    operator  = "EQUALS"
-    value     = "\"Apple\""
   }
 
   tags = {

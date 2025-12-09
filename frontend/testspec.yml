@@ -15,14 +15,14 @@ phases:
       - npm run build
       - echo "Setup completed successfully"
 
-  # テスト実行フェーズ: クリティカルパステストのみ実行
+  # テスト実行フェーズ: スモークテストのみ実行（5テスト、10分以内目標）
   test:
     commands:
-      - echo "Starting Playwright E2E tests..."
-      - echo "Running ONLY critical path tests on Device Farm..."
-      - npx playwright test e2e/critical-path.spec.ts --project=chromium --reporter=html --reporter=json --reporter=junit
+      - echo "Starting Playwright smoke tests on Device Farm..."
+      - echo "Running 5 essential tests for quick validation..."
+      - npx playwright test e2e/smoke-test.spec.ts --project=chromium --reporter=html --reporter=junit --timeout=60000
     finally:
-      - echo "Test execution completed"
+      - echo "Smoke test completed"
 
   # クリーンアップフェーズ: テストアーティファクトの収集
   post_test:

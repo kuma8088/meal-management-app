@@ -391,6 +391,94 @@ Device Farm ではクリティカルパステストのみを実行するよう�
 
 ---
 
+## 問題12: Android テストが SKIPPED になる（totalJobs: 0）
+
+### 問題
+
+Device Farm でテスト実行をスケジュールすると、Android テストが `SKIPPED` ステータスで、`totalJobs: 0` となる：
+
+```json
+{
+  "name": "Android Test Run",
+  "result": "SKIPPED",
+  "counters": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  }
+}
+```
+
+### 原因
+
+デバイスプールのルールで `MANUFACTURER="Samsung"` を使用していたが、`APPIUM_WEB_NODE` テストタイプとの互換性に問題があった。
+
+### 解決策
+
+`MANUFACTURER` 属性の代わりに `PLATFORM` 属性を使用：
+
+```hcl
+# 誤り - APPIUM_WEB_NODE との互換性問題
+rule {
+  attribute = "MANUFACTURER"
+  operator  = "EQUALS"
+  value     = "\"Samsung\""
+}
+
+# 正しい - PLATFORM 属性でより広いデバイス互換性
+rule {
+  attribute = "PLATFORM"
+  operator  = "EQUALS"
+  value     = "\"ANDROID\""
+}
+```
+
+---
+
+## 問題13: デバイスプールのデバイス数が多すぎる（コスト爆発）
+
+### 問題
+
+1回のテスト実行で 65 ジョブが生成され、コストが爆発的に増大：
+
+```
+Test Run Status: RUNNING
+totalJobs: 65
+```
+
+### 原因
+
+`max_devices` が設定されていない（デフォルト 0 = 無制限）ため、プール内の全デバイスでテストが並列実行された。
+
+### 解決策
+
+`max_devices = 1` を設定して、1回のテスト実行で使用するデバイス数を制限：
+
+```hcl
+resource "aws_devicefarm_device_pool" "android" {
+  name        = "my-android-pool"
+  project_arn = aws_devicefarm_project.main.arn
+  max_devices = 1  # 重要: コスト最適化
+
+  rule {
+    attribute = "PLATFORM"
+    operator  = "EQUALS"
+    value     = "\"ANDROID\""
+  }
+}
+```
+
+### コスト最適化のベストプラクティス
+
+| 設定 | 推奨値 | 理由 |
+|-----|-------|-----|
+| max_devices | 1 | 1デバイスで十分な検証が可能 |
+| テスト数 | 5個（スモークテスト） | 10分以内完了目標 |
+| タイムアウト | 60秒/テスト | 異常なハングを防止 |
+
+---
+
 ## まとめ
 
 AWS Device Farm の API は、パラメータ名や値に細かい違いがあり、ドキュメントだけでは把握しにくい部分があります。主な注意点：
@@ -402,6 +490,8 @@ AWS Device Farm の API は、パラメータ名や値に細かい違いがあ�
 5. **必要なアップロード** - テストパッケージとテストスペックの両方が必要
 6. **バージョン番号** - testspec.yml は `version: 0.1` を使用
 7. **テスト範囲** - クリティカルパスのみに限定してコスト最適化
+8. **デバイス数制限** - `max_devices = 1` でコスト最適化
+9. **PLATFORM 属性** - MANUFACTURER より PLATFORM を使用して互換性向上
 
 これらの落とし穴を避けることで、Device Farm を使用した CI/CD パイプラインを正しく構築できます。
 
