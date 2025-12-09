@@ -79,6 +79,9 @@ jobs:
           cp package-lock.json test-package/
           cp playwright.config.ts test-package/
           cp tsconfig.json test-package/
+          cp tsconfig.app.json test-package/
+          cp tsconfig.node.json test-package/
+          cp -r tests test-package/
           cp -r node_modules test-package/
 
           cd test-package
