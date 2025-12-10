@@ -9,8 +9,9 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 - **API**: AWS API Gateway (REST API)
 - **データベース**: Amazon DynamoDB
 - **ストレージ**: Amazon S3
-- **認証**: Amazon Cognito, LINE User ID
+- **認証**: Amazon Cognito, LINE LIFF (LINE Front-end Framework)
 - **AI**: Amazon Bedrock (Claude 3)
+- **CDN**: Amazon CloudFront
 - **画像認識**: Amazon Rekognition / Amazon Textract
 - **メッセージング**: LINE Messaging API
 - **ロギング**: Amazon CloudWatch Logs
@@ -33,6 +34,8 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 ├── src/
 │   └── lambda/            # Lambda関数
 │       ├── common/        # 共通ライブラリ
+│       │   └── auth.py    # 認証ヘルパー（Cognito/LINE両対応）
+│       ├── authorizer/    # API Gateway Lambda Authorizer
 │       ├── line_handler/  # LINE Webhook Handler
 │       ├── meal_registration/  # 食事登録
 │       ├── food_search/   # 食品検索
@@ -43,6 +46,8 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 │   │   ├── api/          # APIクライアント
 │   │   ├── components/   # UIコンポーネント
 │   │   ├── contexts/     # Reactコンテキスト
+│   │   │   ├── AuthContext.tsx   # Cognito認証
+│   │   │   └── LiffContext.tsx   # LINE LIFF認証
 │   │   ├── pages/        # ページコンポーネント
 │   │   └── types/        # TypeScript型定義
 │   ├── e2e/              # E2Eテスト（Playwright）
@@ -193,6 +198,7 @@ terraform apply
 - `VITE_API_BASE_URL`: API Gateway URL
 - `VITE_COGNITO_USER_POOL_ID`: Cognito User Pool ID
 - `VITE_COGNITO_CLIENT_ID`: Cognito Client ID
+- `VITE_LIFF_ID`: LINE LIFF アプリケーション ID（LIFF認証使用時）
 
 ## LINE Bot アーキテクチャ
 
@@ -209,6 +215,36 @@ LINE App → API Gateway → line_handler → daily_summary (総評機能)
 - Lambda 間呼び出しには IAM の `lambda:InvokeFunction` 権限が必要
 
 詳細は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照。
+
+## 認証アーキテクチャ
+
+本アプリケーションは2つの認証方式をサポートしています：
+
+### 1. Cognito 認証（ブラウザアクセス）
+
+```
+ブラウザ → CloudFront → React App → Cognito → API Gateway → Lambda
+```
+
+- 標準的なメール/パスワード認証
+- JWT トークンを `Authorization: Bearer <token>` ヘッダーで送信
+
+### 2. LIFF 認証（LINE アプリ内ブラウザ）
+
+```
+LINE App → LIFF → React App → LINE ID Token → API Gateway → Lambda Authorizer → Lambda
+```
+
+- LINE Login による認証
+- LIFF SDK で取得した ID トークンを使用
+- Lambda Authorizer が LINE ID トークンを検証し、user_id を抽出
+
+### 認証の自動切り替え
+
+フロントエンドは実行環境を自動検出し、適切な認証方式を選択します：
+
+- LIFF 環境内: LINE ID トークンを使用
+- ブラウザ: Cognito JWT トークンを使用
 
 ## ドキュメント
 
