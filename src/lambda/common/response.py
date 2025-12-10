@@ -2,8 +2,21 @@
 APIレスポンスヘルパー
 """
 import json
+from decimal import Decimal
 from typing import Any, Dict, Optional, Union
 from .exceptions import AppException
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """DynamoDB Decimal型をJSONシリアライズするためのエンコーダー"""
+
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # 整数の場合はintに、それ以外はfloatに変換
+            if obj % 1 == 0:
+                return int(obj)
+            return float(obj)
+        return super().default(obj)
 
 
 def create_response(
@@ -35,7 +48,7 @@ def create_response(
     return {
         "statusCode": status_code,
         "headers": default_headers,
-        "body": json.dumps(body, ensure_ascii=False)
+        "body": json.dumps(body, ensure_ascii=False, cls=DecimalEncoder)
     }
 
 

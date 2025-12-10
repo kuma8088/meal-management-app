@@ -67,6 +67,7 @@ yarn-error.log*
 frontend/dist/
 frontend/.env
 frontend/.env.local
+frontend/.env.production
 
 # Playwright
 frontend/test-results/
@@ -77,6 +78,7 @@ frontend/playwright/.cache/
 *.zip
 lambda_packages/
 terraform/terraform.tfvars
+terraform/tfplan*
 
 # Large data files
 data/
@@ -86,3 +88,4 @@ data/
 content-seeds.md
 portfolio-draft.md
 docs/ROADMAP_STATUS.md
+.claude/

@@ -14,7 +14,8 @@ data "aws_cloudfront_origin_request_policy" "managed_all_viewer" {
 
 # CloudFront Distribution for Test Environment Hosting
 resource "aws_cloudfront_distribution" "test_environment" {
-  enabled = true
+  enabled             = true
+  default_root_object = "index.html"
 
   origin {
     domain_name = aws_s3_bucket.frontend.bucket_regional_domain_name
@@ -62,6 +63,21 @@ resource "aws_cloudfront_distribution" "test_environment" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.managed_all_viewer.id
 
     viewer_protocol_policy = "https-only"
+  }
+
+  # SPA用カスタムエラーレスポンス（React Routerサポート）
+  custom_error_response {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 10
+  }
+
+  custom_error_response {
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 10
   }
 
   restrictions {

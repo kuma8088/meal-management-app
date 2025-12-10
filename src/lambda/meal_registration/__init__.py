@@ -25,7 +25,8 @@ from common import (
     ResourceNotFoundError,
     get_logger,
     success_response,
-    error_response
+    error_response,
+    require_auth,
 )
 
 logger = get_logger(__name__)
@@ -40,9 +41,13 @@ meals_db = DynamoDBHelper(MEALS_TABLE_NAME, AWS_REGION)
 foods_db = DynamoDBHelper(FOODS_TABLE_NAME, AWS_REGION)
 
 
+@require_auth
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     API Gatewayからのリクエストを処理する
+
+    認証: Cognito トークンまたは LINE User ID が必要
+    認証成功時、event["auth_user"] に認証ユーザー情報が追加される
 
     Args:
         event: API Gatewayイベント
@@ -113,8 +118,14 @@ def create_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     # リクエストボディを解析
     body = json.loads(event.get("body", "{}"))
 
-    # 必須フィールドのバリデーション
-    user_id = body.get("user_id")
+    # 認証済みユーザーIDを取得（優先）
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+
+    # フォールバック: リクエストボディから取得（内部呼び出し用）
+    if not user_id:
+        user_id = body.get("user_id")
+
     if not user_id:
         raise ValidationError("user_idは必須です", details={"field": "user_id"})
 
@@ -150,6 +161,18 @@ def create_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     # 栄養情報を自動計算（Property 11: 栄養情報の自動計算）
     nutrition = NutritionCalculator.calculate_meal_nutrition(meal_foods, food_database)
 
+    # 各食品に名前と計算済み栄養情報を追加（表示用）
+    for meal_food in meal_foods:
+        food = food_database.get(meal_food.food_id)
+        if food:
+            meal_food.name = food.name
+            # 100gあたりの栄養情報から実際の量に基づいて計算
+            ratio = meal_food.amount / 100.0
+            meal_food.calories = food.calories_per_100g * ratio
+            meal_food.protein = food.protein_per_100g * ratio
+            meal_food.fat = food.fat_per_100g * ratio
+            meal_food.carbs = food.carbs_per_100g * ratio
+
     # Mealオブジェクトを作成（Property 2: ユーザーIDとの関連付け）
     meal_id = str(uuid.uuid4())
     meal = Meal(
@@ -166,9 +189,9 @@ def create_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     # DynamoDBに保存（Property 10: 食事記録の保存）
-    # Mealsテーブル構造: PK: meal_id, SK: user_id#timestamp
+    # Mealsテーブル構造: PK: meal_id, SK: user_id_timestamp
     meal_data = meal.to_dict()
-    meal_data["sk"] = f"{user_id}#{timestamp.isoformat()}"  # Sort Key for querying by user
+    meal_data["user_id_timestamp"] = f"{user_id}#{timestamp.isoformat()}"  # Sort Key for querying by user
 
     meals_db.put_item(meal_data)
 
@@ -209,7 +232,14 @@ def list_meals(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     # クエリパラメータを取得
     query_params = event.get("queryStringParameters") or {}
-    user_id = query_params.get("user_id")
+
+    # 認証済みユーザーIDを取得（優先）
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+
+    # フォールバック: クエリパラメータから取得（内部呼び出し用）
+    if not user_id:
+        user_id = query_params.get("user_id")
 
     if not user_id:
         raise ValidationError("user_idは必須です", details={"field": "user_id"})
@@ -217,6 +247,13 @@ def list_meals(event: Dict[str, Any]) -> Dict[str, Any]:
     # オプション: 開始日と終了日（ISO 8601フォーマット）
     start_date = query_params.get("start_date")
     end_date = query_params.get("end_date")
+
+    # 日付のみの形式（YYYY-MM-DD）の場合、時刻を付与
+    # start_date は 00:00:00 から、end_date は 23:59:59.999999 までを含める
+    if start_date and "T" not in start_date:
+        start_date = f"{start_date}T00:00:00"
+    if end_date and "T" not in end_date:
+        end_date = f"{end_date}T23:59:59.999999"
 
     # ページネーション用パラメータ
     limit = int(query_params.get("limit", 100))
@@ -231,26 +268,33 @@ def list_meals(event: Dict[str, Any]) -> Dict[str, Any]:
     expression_values = {":user_id": user_id}
 
     # 期間フィルタリング（Property 25）
+    expression_attr_names = {}
     if start_date and end_date:
         key_condition += " AND #ts BETWEEN :start_date AND :end_date"
         expression_values[":start_date"] = start_date
         expression_values[":end_date"] = end_date
+        expression_attr_names["#ts"] = "timestamp"
     elif start_date:
         key_condition += " AND #ts >= :start_date"
         expression_values[":start_date"] = start_date
+        expression_attr_names["#ts"] = "timestamp"
     elif end_date:
         key_condition += " AND #ts <= :end_date"
         expression_values[":end_date"] = end_date
+        expression_attr_names["#ts"] = "timestamp"
 
     # クエリパラメータの準備
     query_params_dict = {
-        "IndexName": "GSI1",
+        "IndexName": "UserIdTimestampIndex",
         "KeyConditionExpression": key_condition,
-        "ExpressionAttributeNames": {"#ts": "timestamp"},
         "ExpressionAttributeValues": expression_values,
         "Limit": limit,
         "ScanIndexForward": False  # 降順（最新が先）
     }
+
+    # ExpressionAttributeNames は使用時のみ追加
+    if expression_attr_names:
+        query_params_dict["ExpressionAttributeNames"] = expression_attr_names
 
     # ページネーション: ExclusiveStartKeyの追加
     if next_token:
@@ -326,12 +370,12 @@ def get_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     if not meal_id:
         raise ValidationError("meal_idは必須です", details={"field": "meal_id"})
 
-    # クエリパラメータからuser_idを取得（認証用）
-    query_params = event.get("queryStringParameters") or {}
-    user_id = query_params.get("user_id")
+    # 認証済みユーザーIDを取得
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
 
-    # DynamoDBから食事記録を取得
-    meal_data = meals_db.get_item({"meal_id": meal_id})
+    # DynamoDBから食事記録を取得（複合キーテーブルのためスキャンで検索）
+    meal_data = _find_meal_by_id(meal_id)
 
     if not meal_data:
         raise ResourceNotFoundError(
@@ -382,8 +426,12 @@ def update_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     # リクエストボディを解析
     body = json.loads(event.get("body", "{}"))
 
-    # 既存の食事記録を取得
-    existing_meal_data = meals_db.get_item({"meal_id": meal_id})
+    # 認証済みユーザーIDを取得
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+
+    # 既存の食事記録を取得（複合キーテーブルのためスキャンで検索）
+    existing_meal_data = _find_meal_by_id(meal_id)
 
     if not existing_meal_data:
         raise ResourceNotFoundError(
@@ -392,7 +440,6 @@ def update_meal(event: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     # Property 1: ユーザーデータ分離の検証
-    user_id = body.get("user_id")
     if user_id and existing_meal_data.get("user_id") != user_id:
         raise ResourceNotFoundError(
             "食事記録が見つかりません",
@@ -426,6 +473,17 @@ def update_meal(event: Dict[str, Any]) -> Dict[str, Any]:
         # 栄養情報を再計算
         nutrition = NutritionCalculator.calculate_meal_nutrition(meal_foods, food_database)
 
+        # 各食品に名前と計算済み栄養情報を追加（表示用）
+        for meal_food in meal_foods:
+            food = food_database.get(meal_food.food_id)
+            if food:
+                meal_food.name = food.name
+                ratio = meal_food.amount / 100.0
+                meal_food.calories = food.calories_per_100g * ratio
+                meal_food.protein = food.protein_per_100g * ratio
+                meal_food.fat = food.fat_per_100g * ratio
+                meal_food.carbs = food.carbs_per_100g * ratio
+
         # データを更新
         updated_data["foods"] = [f.to_dict() for f in meal_foods]
         updated_data["total_calories"] = nutrition["total_calories"]
@@ -439,8 +497,11 @@ def update_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     if timestamp_str:
         timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
         updated_data["timestamp"] = timestamp.isoformat()
-        # SKも更新
-        updated_data["sk"] = f"{existing_meal_data['user_id']}#{timestamp.isoformat()}"
+        # user_id_timestampも更新
+        updated_data["user_id_timestamp"] = f"{existing_meal_data['user_id']}#{timestamp.isoformat()}"
+
+    # 更新日時を設定
+    updated_data["updated_at"] = datetime.utcnow().isoformat()
 
     # DynamoDBを更新
     meals_db.put_item(updated_data)
@@ -456,6 +517,60 @@ def update_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     return success_response(updated_data)
+
+
+def _find_meal_by_id(meal_id: str) -> Optional[Dict[str, Any]]:
+    """
+    meal_id でスキャンして食事記録を取得する
+
+    複合キーテーブル (PK: meal_id, SK: user_id_timestamp) のため、
+    meal_id だけでは get_item が使えない。スキャンで検索する。
+
+    Args:
+        meal_id: 食事記録ID
+
+    Returns:
+        食事記録データ（存在しない場合はNone）
+
+    Note:
+        DynamoDB Scan の Limit はフィルタ適用前に評価されるため、
+        Limit を使うとフィルタ条件に一致するアイテムを見つけられない可能性がある。
+        そのため Limit を使わず全件スキャンし、一致したら即座に返す。
+    """
+    # ページネーションで全件スキャン
+    last_evaluated_key = None
+    while True:
+        scan_params = {
+            "FilterExpression": "meal_id = :meal_id",
+            "ExpressionAttributeValues": {":meal_id": meal_id}
+        }
+        if last_evaluated_key:
+            scan_params["ExclusiveStartKey"] = last_evaluated_key
+
+        response = meals_db.table.scan(**scan_params)
+        items = response.get("Items", [])
+
+        if items:
+            from decimal import Decimal
+            # Decimal を float に変換
+            item = items[0]
+            for key, value in item.items():
+                if isinstance(value, Decimal):
+                    item[key] = float(value)
+                elif isinstance(value, list):
+                    item[key] = [
+                        {k: float(v) if isinstance(v, Decimal) else v for k, v in i.items()}
+                        if isinstance(i, dict) else i
+                        for i in value
+                    ]
+            return item
+
+        # 続きがあればページネーション
+        last_evaluated_key = response.get("LastEvaluatedKey")
+        if not last_evaluated_key:
+            break
+
+    return None
 
 
 def delete_meal(event: Dict[str, Any]) -> Dict[str, Any]:
@@ -477,12 +592,12 @@ def delete_meal(event: Dict[str, Any]) -> Dict[str, Any]:
     if not meal_id:
         raise ValidationError("meal_idは必須です", details={"field": "meal_id"})
 
-    # クエリパラメータからuser_idを取得（認証用）
-    query_params = event.get("queryStringParameters") or {}
-    user_id = query_params.get("user_id")
+    # 認証済みユーザーIDを取得
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
 
-    # 既存の食事記録を取得
-    existing_meal_data = meals_db.get_item({"meal_id": meal_id})
+    # 既存の食事記録を取得（複合キーテーブルのためスキャンで検索）
+    existing_meal_data = _find_meal_by_id(meal_id)
 
     if not existing_meal_data:
         raise ResourceNotFoundError(
@@ -497,8 +612,12 @@ def delete_meal(event: Dict[str, Any]) -> Dict[str, Any]:
             details={"meal_id": meal_id}
         )
 
-    # DynamoDBから削除
-    meals_db.delete_item({"meal_id": meal_id})
+    # 複合キーで削除（PK: meal_id, SK: user_id_timestamp）
+    user_id_timestamp = existing_meal_data.get("user_id_timestamp")
+    meals_db.delete_item({
+        "meal_id": meal_id,
+        "user_id_timestamp": user_id_timestamp
+    })
 
     logger.info(
         f"食事記録を削除しました: {meal_id}",

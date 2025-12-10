@@ -6,11 +6,22 @@ import { apiClient } from './client';
 import type { Food, SearchFoodParams } from '../types/api';
 
 /**
+ * 食品検索レスポンス
+ */
+interface FoodSearchResponse {
+  foods: Food[];
+  count: number;
+  ai_search_available?: boolean;
+  message?: string;
+}
+
+/**
  * 食品を検索
  */
 export const searchFoods = async (params: SearchFoodParams): Promise<Food[]> => {
-  const response = await apiClient.get<Food[]>('/foods/search', { params });
-  return response.data;
+  const response = await apiClient.get<FoodSearchResponse>('/foods/search', { params });
+  // レスポンスデータの安全な抽出（undefined/null対策）
+  return response.data?.foods ?? [];
 };
 
 /**

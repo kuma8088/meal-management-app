@@ -8,7 +8,8 @@ import os
 import hmac
 import hashlib
 import base64
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
 import sys
 from pathlib import Path
 import urllib.request
@@ -24,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from common import (
     ValidationError,
     AuthorizationError,
+    DynamoDBHelper,
     get_logger,
     success_response,
     error_response,
@@ -37,9 +39,17 @@ LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply"
 DAILY_SUMMARY_FUNCTION_NAME = os.environ.get("DAILY_SUMMARY_FUNCTION_NAME", "")
+FOOD_SEARCH_FUNCTION_NAME = os.environ.get("FOOD_SEARCH_FUNCTION_NAME", "")
+MEAL_REGISTRATION_FUNCTION_NAME = os.environ.get("MEAL_REGISTRATION_FUNCTION_NAME", "")
+USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "Users")
+LIFF_ID = os.environ.get("LIFF_ID", "2008658695-M1gQv1N3")
+LIFF_URL = f"https://liff.line.me/{LIFF_ID}"
 
 # Lambda clients (他のLambda関数を呼び出す)
 lambda_client = boto3.client("lambda")
+
+# DynamoDB helper
+users_db = DynamoDBHelper(USERS_TABLE_NAME)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -127,6 +137,69 @@ def verify_signature(event: Dict[str, Any]) -> bool:
     return is_valid
 
 
+def get_or_create_user(line_user_id: str) -> str:
+    """
+    LINE User ID からユーザーを取得または作成する
+
+    Args:
+        line_user_id: LINE User ID
+
+    Returns:
+        user_id: システム内部のユーザーID
+
+    Note:
+        LINE ユーザーが初めてメッセージを送信した際に、
+        自動的に Users テーブルにエントリを作成する。
+    """
+    import uuid
+    from datetime import datetime
+
+    try:
+        # LineUserIdIndex GSI でユーザーを検索
+        response = users_db.table.query(
+            IndexName="LineUserIdIndex",
+            KeyConditionExpression="line_user_id = :line_user_id",
+            ExpressionAttributeValues={
+                ":line_user_id": line_user_id
+            },
+            Limit=1
+        )
+
+        items = response.get("Items", [])
+
+        if items:
+            # 既存ユーザーが見つかった
+            user_id = items[0].get("user_id")
+            logger.info(f"Found existing user: line_user_id={line_user_id}, user_id={user_id}")
+            return user_id
+
+        # 新規ユーザーを作成
+        user_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+
+        user_data = {
+            "user_id": user_id,
+            "line_user_id": line_user_id,
+            "created_at": now,
+            "updated_at": now,
+            # デフォルト値（後でプロフィール設定で更新可能）
+            "tdee": 2000.0,
+            "bmr": 1500.0,
+            "source": "line"
+        }
+
+        users_db.put_item(user_data)
+
+        logger.info(f"Created new user: line_user_id={line_user_id}, user_id={user_id}")
+
+        return user_id
+
+    except Exception as e:
+        logger.error(f"Error in get_or_create_user: {str(e)}", exc_info=True)
+        # エラー時は LINE User ID をそのまま使用（フォールバック）
+        return line_user_id
+
+
 def process_event(line_event: Dict[str, Any]) -> None:
     """
     LINE Webhookイベントを処理する
@@ -155,15 +228,18 @@ def process_event(line_event: Dict[str, Any]) -> None:
         logger.warning("Missing user_id or reply_token")
         return
 
-    logger.info(f"Processing message: type={message_type}, user={line_user_id}")
+    # ユーザーを取得または作成
+    user_id = get_or_create_user(line_user_id)
+
+    logger.info(f"Processing message: type={message_type}, line_user_id={line_user_id}, user_id={user_id}")
 
     try:
         if message_type == "text":
             # テキストメッセージを処理（要件: 11.2, 11.3, 11.4）
-            process_text_message(line_user_id, message, reply_token)
+            process_text_message(user_id, line_user_id, message, reply_token)
         elif message_type == "image":
             # 画像メッセージを処理（バーコード認識）
-            process_image_message(line_user_id, message, reply_token)
+            process_image_message(user_id, message, reply_token)
         else:
             # 未対応のメッセージタイプ
             logger.info(f"Unsupported message type: {message_type}")
@@ -174,12 +250,13 @@ def process_event(line_event: Dict[str, Any]) -> None:
         send_reply(reply_token, "エラーが発生しました。後ほど再度お試しください。")
 
 
-def process_text_message(line_user_id: str, message: Dict[str, Any], reply_token: str) -> None:
+def process_text_message(user_id: str, line_user_id: str, message: Dict[str, Any], reply_token: str) -> None:
     """
     テキストメッセージを処理する
 
     Args:
-        line_user_id: LINE User ID
+        user_id: システム内部のユーザーID（UUID形式）
+        line_user_id: LINE User ID（U + 32文字の16進数）
         message: メッセージオブジェクト
         reply_token: 返信トークン
 
@@ -190,12 +267,18 @@ def process_text_message(line_user_id: str, message: Dict[str, Any], reply_token
     logger.info(f"Processing text message: {text}")
 
     # メッセージの意図を判定
-    if is_daily_advice_request(text):
+    if is_id_request(text):
+        # ID確認リクエスト（デバッグ・サポート用）
+        handle_id_request(user_id, line_user_id, reply_token)
+    elif is_app_request(text):
+        # アプリ（LIFF）リンクリクエスト
+        send_app_link(reply_token)
+    elif is_daily_advice_request(text):
         # 総評リクエスト（要件: 11.3）
-        handle_daily_advice_request(line_user_id, reply_token)
+        handle_daily_advice_request(user_id, reply_token)
     elif is_food_registration_request(text):
         # 食事登録リクエスト（要件: 11.2）
-        handle_food_registration_request(line_user_id, text, reply_token)
+        handle_food_registration_request(user_id, text, reply_token)
     else:
         # ヘルプメッセージを送信（要件: 11.4）
         send_help_message(reply_token)
@@ -287,6 +370,79 @@ def process_image_message(line_user_id: str, message: Dict[str, Any], reply_toke
         send_reply(reply_token, "画像の処理中にエラーが発生しました。")
 
 
+def is_id_request(text: str) -> bool:
+    """
+    テキストがID確認リクエストかどうか判定
+
+    Args:
+        text: テキストメッセージ
+
+    Returns:
+        ID確認リクエストならTrue
+    """
+    text_lower = text.lower().strip()
+    keywords = ["id", "myid", "my id", "マイid", "ユーザーid", "userid"]
+
+    return text_lower in keywords or any(keyword in text_lower for keyword in keywords)
+
+
+def handle_id_request(user_id: str, line_user_id: str, reply_token: str) -> None:
+    """
+    ユーザーIDを返信する（デバッグ・サポート用）
+
+    Args:
+        user_id: システム内部のユーザーID
+        line_user_id: LINE User ID
+        reply_token: 返信トークン
+    """
+    message = f"""【あなたのID情報】
+
+■ LINE User ID
+{line_user_id}
+
+■ システムユーザーID
+{user_id}
+
+※ LINE User IDはLINEアカウントを識別するためのIDです。
+※ LIFFアプリ利用時の認証に使用されます。"""
+
+    send_reply(reply_token, message)
+
+
+def is_app_request(text: str) -> bool:
+    """
+    テキストがアプリ（LIFF）リンクリクエストかどうか判定
+
+    Args:
+        text: テキストメッセージ
+
+    Returns:
+        アプリリンクリクエストならTrue
+    """
+    keywords = ["アプリ", "web", "ウェブ", "webアプリ", "liff"]
+    text_lower = text.lower()
+
+    return any(keyword.lower() in text_lower for keyword in keywords)
+
+
+def send_app_link(reply_token: str) -> None:
+    """
+    アプリ（LIFF）リンクを送信する
+
+    Args:
+        reply_token: 返信トークン
+    """
+    message = f"""📱 食事管理アプリ
+
+下のリンクをタップしてアプリを開いてください：
+
+{LIFF_URL}
+
+※ プロフィール設定や食事履歴の確認ができます"""
+
+    send_reply(reply_token, message)
+
+
 def is_daily_advice_request(text: str) -> bool:
     """
     テキストが総評リクエストかどうか判定
@@ -314,11 +470,73 @@ def is_food_registration_request(text: str) -> bool:
     Returns:
         食事登録リクエストならTrue
     """
-    # キーワード: "食べた", "朝食", "昼食", "夕食", "おやつ", "登録"
+    # パターン1: 「ご飯 150g」形式（食品名 + 量）
+    amount_pattern = r'\d+\s*(g|グラム|ml|ミリリットル)'
+    if re.search(amount_pattern, text, re.IGNORECASE):
+        return True
+
+    # パターン2: キーワードベース
     keywords = ["食べた", "朝食", "昼食", "夕食", "おやつ", "登録", "記録"]
     text_lower = text.lower()
 
     return any(keyword in text_lower for keyword in keywords)
+
+
+def parse_food_and_amount(text: str) -> Tuple[Optional[str], Optional[float], str]:
+    """
+    テキストから食品名と量を抽出する
+
+    Args:
+        text: テキストメッセージ（例: "ご飯 150g", "朝食 白米200g"）
+
+    Returns:
+        (food_name, amount_g, meal_type): 食品名、量(g)、食事タイプ
+    """
+    # 食事タイプの判定
+    meal_type = "snack"  # デフォルト
+    meal_type_keywords = {
+        "朝食": "breakfast",
+        "朝": "breakfast",
+        "昼食": "lunch",
+        "昼": "lunch",
+        "夕食": "dinner",
+        "夜": "dinner",
+        "夕": "dinner",
+        "おやつ": "snack",
+        "間食": "snack",
+    }
+    for keyword, mtype in meal_type_keywords.items():
+        if keyword in text:
+            meal_type = mtype
+            text = text.replace(keyword, "").strip()
+            break
+
+    # 量のパターン（例: 150g, 200グラム, 100ml）
+    amount_pattern = r'(\d+(?:\.\d+)?)\s*(g|グラム|ml|ミリリットル)'
+    amount_match = re.search(amount_pattern, text, re.IGNORECASE)
+
+    if not amount_match:
+        return None, None, meal_type
+
+    amount = float(amount_match.group(1))
+    unit = amount_match.group(2).lower()
+
+    # ml はそのまま g として扱う（水など）
+    if unit in ['ml', 'ミリリットル']:
+        amount_g = amount
+    else:
+        amount_g = amount
+
+    # 食品名を抽出（量の部分を除去）
+    food_name = re.sub(amount_pattern, '', text, flags=re.IGNORECASE).strip()
+    # 余分なキーワードを除去
+    for keyword in ["食べた", "を", "に", "登録", "記録"]:
+        food_name = food_name.replace(keyword, "").strip()
+
+    if not food_name:
+        return None, None, meal_type
+
+    return food_name, amount_g, meal_type
 
 
 def handle_daily_advice_request(line_user_id: str, reply_token: str) -> None:
@@ -396,18 +614,111 @@ def handle_food_registration_request(line_user_id: str, text: str, reply_token: 
 
     要件: 11.2
     """
-    # TODO: テキストから食品名と量を抽出する自然言語処理
-    # 例: "朝食にご飯200gと納豆を食べた" -> ["ご飯", "200g"], ["納豆", "50g"]
+    # テキストから食品名と量を抽出
+    food_name, amount_g, meal_type = parse_food_and_amount(text)
 
-    # 現在は簡易的な実装として、ヘルプメッセージを返す
-    message = """食事登録は現在準備中です。
+    if not food_name or not amount_g:
+        # パースできなかった場合はヘルプメッセージ
+        message = """食事登録の形式が認識できませんでした。
 
-以下の形式でメッセージを送信してください：
-「朝食にご飯200gと納豆50gを食べた」
+以下の形式で送信してください：
+「ご飯 150g」
+「朝食 白米 200g」
+「昼食 サラダ100g」
 
 または、食品のバーコード画像を送信してください。"""
+        send_reply(reply_token, message)
+        return
 
-    send_reply(reply_token, message)
+    logger.info(f"Parsed food registration: food={food_name}, amount={amount_g}g, meal_type={meal_type}")
+
+    try:
+        # Step 1: 食品検索
+        search_response = lambda_client.invoke(
+            FunctionName=FOOD_SEARCH_FUNCTION_NAME,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({
+                "queryStringParameters": {
+                    "query": food_name,
+                    "limit": "5"
+                }
+            })
+        )
+
+        search_result = json.loads(search_response['Payload'].read())
+
+        if search_result.get("statusCode") != 200:
+            logger.error(f"Food search failed: {search_result}")
+            send_reply(reply_token, f"「{food_name}」の検索中にエラーが発生しました。")
+            return
+
+        body = json.loads(search_result.get("body", "{}"))
+        foods = body.get("foods", [])
+
+        if not foods:
+            send_reply(reply_token, f"「{food_name}」に該当する食品が見つかりませんでした。別の名前で試してください。")
+            return
+
+        # 最初の検索結果を使用
+        food = foods[0]
+        food_id = food.get("food_id")
+        matched_name = food.get("name") or food.get("food_name", food_name)
+
+        logger.info(f"Found food: id={food_id}, name={matched_name}")
+
+        # Step 2: 食事登録
+        registration_response = lambda_client.invoke(
+            FunctionName=MEAL_REGISTRATION_FUNCTION_NAME,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({
+                "httpMethod": "POST",
+                "path": "/meals",
+                "body": json.dumps({
+                    "user_id": line_user_id,
+                    "meal_type": meal_type,
+                    "foods": [
+                        {
+                            "food_id": food_id,
+                            "amount": amount_g
+                        }
+                    ]
+                })
+            })
+        )
+
+        reg_result = json.loads(registration_response['Payload'].read())
+
+        if reg_result.get("statusCode") in [200, 201]:
+            reg_body = json.loads(reg_result.get("body", "{}"))
+            total_calories = reg_body.get("total_calories", 0)
+            total_protein = reg_body.get("total_protein", 0)
+            total_fat = reg_body.get("total_fat", 0)
+            total_carbs = reg_body.get("total_carbs", 0)
+
+            meal_type_jp = {
+                "breakfast": "朝食",
+                "lunch": "昼食",
+                "dinner": "夕食",
+                "snack": "間食"
+            }.get(meal_type, "食事")
+
+            message = f"""✅ 食事を登録しました！
+
+【{meal_type_jp}】{matched_name} {amount_g:.0f}g
+
+カロリー: {total_calories:.0f} kcal
+たんぱく質: {total_protein:.1f} g
+脂質: {total_fat:.1f} g
+炭水化物: {total_carbs:.1f} g"""
+
+            send_reply(reply_token, message)
+        else:
+            logger.error(f"Meal registration failed: {reg_result}")
+            send_reply(reply_token, "食事の登録中にエラーが発生しました。")
+
+    except Exception as e:
+        logger.error(f"Error in food registration: {str(e)}", exc_info=True)
+        send_reply(reply_token, "食事登録中にエラーが発生しました。後ほど再度お試しください。")
 
 
 def send_help_message(reply_token: str) -> None:
@@ -422,11 +733,18 @@ def send_help_message(reply_token: str) -> None:
     help_text = """【使い方】
 
 ■ 食事登録
-食品のバーコード画像を送信するか、以下の形式でメッセージを送信してください：
-「朝食にご飯200gと納豆50gを食べた」
+以下の形式でメッセージを送信してください：
+「ご飯 150g」
+「朝食 白米 200g」
+「昼食 サラダ 100g」
+
+または、食品のバーコード画像を送信してください。
 
 ■ 本日の総評
 「総評」または「今日のアドバイス」と送信してください。
+
+■ アプリを開く
+「アプリ」と送信してください。
 
 ■ その他
 質問や不明な点があれば、「ヘルプ」と送信してください。"""

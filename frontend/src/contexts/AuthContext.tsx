@@ -1,7 +1,9 @@
 /**
  * 認証コンテキスト
  *
- * Amazon Cognitoを使用した認証管理
+ * Amazon Cognito または LINE (LIFF) を使用した認証管理
+ * - 通常ブラウザ: Cognito 認証
+ * - LIFF 経由: LINE 認証 (LINE User ID で API 呼び出し)
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -13,7 +15,7 @@ import {
   CognitoUserSession,
   CognitoUserAttribute,
 } from 'amazon-cognito-identity-js';
-import { setAuthTokens, clearAuthTokens } from '../api/client';
+import { setAuthTokens, clearAuthTokens, setLineAuth, clearLineAuth, apiClient } from '../api/client';
 
 // Cognito設定（環境変数から取得）
 const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID || '';
@@ -28,18 +30,24 @@ const userPool = new CognitoUserPool({
 // 型定義
 // ========================================
 
+export type AuthType = 'cognito' | 'line';
+
 export interface User {
   userId: string;
   username: string;
   email: string;
+  authType: AuthType;
+  lineUserId?: string;  // LINE User ID (LIFF経由の場合)
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  authType: AuthType | null;
   signUp: (username: string, email: string, password: string) => Promise<void>;
   confirmSignUp: (username: string, code: string) => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
+  signInWithLine: (lineUserId: string, displayName: string) => Promise<void>;
   signOut: () => void;
   refreshSession: () => Promise<void>;
 }
@@ -106,6 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   userId: subAttr?.Value || '',
                   username: cognitoUser.getUsername(),
                   email: emailAttr?.Value || '',
+                  authType: 'cognito',
                 });
 
                 setLoading(false);
@@ -116,22 +125,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
         } else {
           // Cognitoセッションが取得できない場合、localStorageから直接復元
-          // (Playwright環境などでの互換性のため)
-          const idToken = localStorage.getItem('idToken');
-          if (idToken) {
-            try {
-              // JWTをデコード (base64)
-              const payload = JSON.parse(atob(idToken.split('.')[1]));
+          const authType = localStorage.getItem('authType') as AuthType | null;
+
+          if (authType === 'line') {
+            // LINE認証の復元
+            const lineUserId = localStorage.getItem('lineUserId');
+            const lineDisplayName = localStorage.getItem('lineDisplayName');
+            const internalUserId = localStorage.getItem('internalUserId');
+            if (lineUserId) {
               setUser({
-                userId: payload.sub || '',
-                username: payload['cognito:username'] || payload.email || '',
-                email: payload.email || '',
+                userId: internalUserId || lineUserId,  // 内部ユーザーID優先
+                username: lineDisplayName || 'LINE User',
+                email: '',
+                authType: 'line',
+                lineUserId: lineUserId,
               });
-            } catch (decodeError) {
-              console.error('Token decode error:', decodeError);
             }
+            setLoading(false);
+          } else {
+            // Cognito認証の復元 (Playwright環境などでの互換性のため)
+            const idToken = localStorage.getItem('idToken');
+            if (idToken) {
+              try {
+                // JWTをデコード (base64)
+                const payload = JSON.parse(atob(idToken.split('.')[1]));
+                setUser({
+                  userId: payload.sub || '',
+                  username: payload['cognito:username'] || payload.email || '',
+                  email: payload.email || '',
+                  authType: 'cognito',
+                });
+              } catch (decodeError) {
+                console.error('Token decode error:', decodeError);
+              }
+            }
+            setLoading(false);
           }
-          setLoading(false);
         }
       } catch (error) {
         console.error('Session check error:', error);
@@ -232,6 +261,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               userId: subAttr?.Value || '',
               username: cognitoUser.getUsername(),
               email: emailAttr?.Value || '',
+              authType: 'cognito',
             });
 
             resolve();
@@ -245,14 +275,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   /**
+   * LINE ログイン (LIFF経由)
+   *
+   * LINE User ID でローカルストレージを設定後、/users/me から内部ユーザーIDを取得
+   */
+  const signInWithLine = async (lineUserId: string, displayName: string): Promise<void> => {
+    // LINE認証情報を保存（API呼び出しに必要）
+    setLineAuth(lineUserId);
+    localStorage.setItem('lineDisplayName', displayName);
+
+    try {
+      // /users/me を呼び出して内部ユーザーIDを取得
+      const response = await apiClient.get('/users/me');
+      const userData = response.data;
+
+      // 内部ユーザーIDを保存
+      const internalUserId = userData.user_id || lineUserId;
+      localStorage.setItem('internalUserId', internalUserId);
+
+      setUser({
+        userId: internalUserId,  // 内部ユーザーID（API呼び出し用）
+        username: displayName,
+        email: '',
+        authType: 'line',
+        lineUserId: lineUserId,  // LINE User ID（認証用）
+      });
+
+      console.log('LINE auth successful, internal user_id:', internalUserId);
+    } catch (error) {
+      console.error('Failed to fetch internal user_id:', error);
+      // フォールバック: LINE User ID をそのまま使用
+      setUser({
+        userId: lineUserId,
+        username: displayName,
+        email: '',
+        authType: 'line',
+        lineUserId: lineUserId,
+      });
+    }
+  };
+
+  /**
    * ログアウト
    */
   const signOut = () => {
-    const cognitoUser = userPool.getCurrentUser();
-    if (cognitoUser) {
-      cognitoUser.signOut();
+    const authType = localStorage.getItem('authType') as AuthType | null;
+
+    if (authType === 'line') {
+      // LINE認証のクリア
+      clearLineAuth();
+      localStorage.removeItem('lineDisplayName');
+      localStorage.removeItem('internalUserId');
+    } else {
+      // Cognito認証のクリア
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        cognitoUser.signOut();
+      }
+      clearAuthTokens();
     }
-    clearAuthTokens();
+
     setUser(null);
   };
 
@@ -296,9 +378,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     loading,
+    authType: user?.authType || null,
     signUp,
     confirmSignUp,
     signIn,
+    signInWithLine,
     signOut,
     refreshSession,
   };

@@ -21,7 +21,7 @@ resource "aws_api_gateway_gateway_response" "cors_response" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
 }
@@ -32,7 +32,7 @@ resource "aws_api_gateway_gateway_response" "cors_response_5xx" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
 }
@@ -81,14 +81,16 @@ resource "aws_lambda_function" "line_handler" {
 
   environment {
     variables = {
-      LINE_CHANNEL_SECRET         = var.line_channel_secret
-      LINE_CHANNEL_ACCESS_TOKEN   = var.line_channel_access_token
-      MEALS_TABLE_NAME            = aws_dynamodb_table.meals.name
-      USERS_TABLE_NAME            = aws_dynamodb_table.users.name
-      GOALS_TABLE_NAME            = aws_dynamodb_table.goals.name
-      ADVICE_USAGE_TABLE_NAME     = aws_dynamodb_table.advice_usage.name
-      FOODS_TABLE_NAME            = aws_dynamodb_table.foods.name
-      DAILY_SUMMARY_FUNCTION_NAME = aws_lambda_function.daily_summary.function_name
+      LINE_CHANNEL_SECRET             = var.line_channel_secret
+      LINE_CHANNEL_ACCESS_TOKEN       = var.line_channel_access_token
+      MEALS_TABLE_NAME                = aws_dynamodb_table.meals.name
+      USERS_TABLE_NAME                = aws_dynamodb_table.users.name
+      GOALS_TABLE_NAME                = aws_dynamodb_table.goals.name
+      ADVICE_USAGE_TABLE_NAME         = aws_dynamodb_table.advice_usage.name
+      FOODS_TABLE_NAME                = aws_dynamodb_table.foods.name
+      DAILY_SUMMARY_FUNCTION_NAME     = aws_lambda_function.daily_summary.function_name
+      FOOD_SEARCH_FUNCTION_NAME       = aws_lambda_function.food_search.function_name
+      MEAL_REGISTRATION_FUNCTION_NAME = aws_lambda_function.meal_registration.function_name
     }
   }
 
@@ -133,13 +135,54 @@ resource "aws_lambda_function" "meal_registration" {
   }
 }
 
-# Cognitoオーソライザー（ブラウザAPI用）
+# Cognitoオーソライザー（ブラウザAPI用）- 後方互換性のため残す
 resource "aws_api_gateway_authorizer" "cognito" {
   name            = "${var.project_name}-${var.environment}-cognito-authorizer"
   rest_api_id     = aws_api_gateway_rest_api.main.id
   type            = "COGNITO_USER_POOLS"
   provider_arns   = [aws_cognito_user_pool.main.arn]
   identity_source = "method.request.header.Authorization"
+}
+
+# Lambda Authorizer（Cognito + LINE 両対応）
+resource "aws_lambda_function" "authorizer" {
+  filename         = "${path.module}/../dist/authorizer.zip"
+  function_name    = "${var.project_name}-${var.environment}-authorizer"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "__init__.lambda_handler"
+  source_code_hash = fileexists("${path.module}/../dist/authorizer.zip") ? filebase64sha256("${path.module}/../dist/authorizer.zip") : ""
+  runtime          = "python3.11"
+  timeout          = 10
+
+  environment {
+    variables = {
+      USERS_TABLE_NAME     = aws_dynamodb_table.users.name
+      COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
+    }
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-authorizer"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+resource "aws_api_gateway_authorizer" "lambda" {
+  name                             = "${var.project_name}-${var.environment}-lambda-authorizer"
+  rest_api_id                      = aws_api_gateway_rest_api.main.id
+  type                             = "REQUEST"
+  authorizer_uri                   = aws_lambda_function.authorizer.invoke_arn
+  authorizer_result_ttl_in_seconds = 0 # キャッシュ無効（どちらのヘッダーでも認証可能にするため）
+  # identity_source を省略して全リクエストで authorizer を呼び出す
+}
+
+resource "aws_lambda_permission" "authorizer_api_gateway" {
+  statement_id  = "AllowAPIGatewayInvokeAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.authorizer.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
 
 # リクエストバリデーター
@@ -183,6 +226,7 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.foods_search.id,
       aws_api_gateway_resource.foods_item.id,
       aws_api_gateway_authorizer.cognito.id,
+      aws_api_gateway_authorizer.lambda.id,
     ]))
   }
 
@@ -253,8 +297,7 @@ resource "aws_api_gateway_method" "meals_post" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.meals.id
   http_method          = "POST"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 }
 
@@ -272,8 +315,7 @@ resource "aws_api_gateway_method" "meals_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.meals.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.querystring.start_date" = false
@@ -303,8 +345,7 @@ resource "aws_api_gateway_method" "meals_item_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.meals_item.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.meal_id" = true
@@ -325,8 +366,7 @@ resource "aws_api_gateway_method" "meals_item_put" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.meals_item.id
   http_method          = "PUT"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 
   request_parameters = {
@@ -348,8 +388,7 @@ resource "aws_api_gateway_method" "meals_item_delete" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.meals_item.id
   http_method   = "DELETE"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.meal_id" = true
@@ -386,8 +425,7 @@ resource "aws_api_gateway_method" "users_post" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.users.id
   http_method          = "POST"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 }
 
@@ -412,8 +450,7 @@ resource "aws_api_gateway_method" "users_item_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.users_item.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.user_id" = true
@@ -434,8 +471,7 @@ resource "aws_api_gateway_method" "users_item_put" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.users_item.id
   http_method          = "PUT"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 
   request_parameters = {
@@ -504,8 +540,7 @@ resource "aws_api_gateway_method" "advice_daily_post" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.advice_daily.id
   http_method          = "POST"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 }
 
@@ -596,7 +631,7 @@ resource "aws_api_gateway_integration_response" "meals_options_200" {
   status_code = aws_api_gateway_method_response.meals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -641,7 +676,7 @@ resource "aws_api_gateway_integration_response" "meals_item_options_200" {
   status_code = aws_api_gateway_method_response.meals_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -686,7 +721,7 @@ resource "aws_api_gateway_integration_response" "users_options_200" {
   status_code = aws_api_gateway_method_response.users_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -731,7 +766,7 @@ resource "aws_api_gateway_integration_response" "users_item_options_200" {
   status_code = aws_api_gateway_method_response.users_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -776,7 +811,7 @@ resource "aws_api_gateway_integration_response" "advice_daily_options_200" {
   status_code = aws_api_gateway_method_response.advice_daily_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -828,8 +863,7 @@ resource "aws_api_gateway_method" "foods_search_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.foods_search.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.querystring.query" = false
@@ -857,8 +891,7 @@ resource "aws_api_gateway_method" "foods_item_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.foods_item.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.food_id" = true
@@ -922,7 +955,7 @@ resource "aws_api_gateway_integration_response" "foods_search_options_200" {
   status_code = aws_api_gateway_method_response.foods_search_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -967,7 +1000,7 @@ resource "aws_api_gateway_integration_response" "foods_item_options_200" {
   status_code = aws_api_gateway_method_response.foods_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -989,8 +1022,7 @@ resource "aws_api_gateway_method" "goals_post" {
   rest_api_id          = aws_api_gateway_rest_api.main.id
   resource_id          = aws_api_gateway_resource.goals.id
   http_method          = "POST"
-  authorization        = "COGNITO_USER_POOLS"
-  authorizer_id        = aws_api_gateway_authorizer.cognito.id
+  authorization        = "NONE"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
 }
 
@@ -1015,8 +1047,7 @@ resource "aws_api_gateway_method" "goals_item_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.goals_item.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.goal_id" = true
@@ -1044,8 +1075,7 @@ resource "aws_api_gateway_method" "users_goals_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.users_goals.id
   http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  authorization = "NONE"
 
   request_parameters = {
     "method.request.path.user_id" = true
@@ -1109,7 +1139,7 @@ resource "aws_api_gateway_integration_response" "goals_options_200" {
   status_code = aws_api_gateway_method_response.goals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1154,7 +1184,7 @@ resource "aws_api_gateway_integration_response" "goals_item_options_200" {
   status_code = aws_api_gateway_method_response.goals_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1199,7 +1229,7 @@ resource "aws_api_gateway_integration_response" "users_goals_options_200" {
   status_code = aws_api_gateway_method_response.users_goals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }

@@ -26,9 +26,20 @@ const createApiClient = (): AxiosInstance => {
   // リクエストインターセプター: 認証トークンを追加
   client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const token = localStorage.getItem('idToken');
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
+      const authType = localStorage.getItem('authType');
+
+      if (authType === 'line') {
+        // LINE認証: X-Line-User-Id ヘッダーを使用
+        const lineUserId = localStorage.getItem('lineUserId');
+        if (lineUserId && config.headers) {
+          config.headers['X-Line-User-Id'] = lineUserId;
+        }
+      } else {
+        // Cognito認証: Bearer トークンを使用
+        const token = localStorage.getItem('idToken');
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
       return config;
     },
@@ -84,21 +95,23 @@ const createApiClient = (): AxiosInstance => {
 export const apiClient = createApiClient();
 
 /**
- * 認証トークンを設定
+ * 認証トークンを設定 (Cognito)
  */
 export const setAuthTokens = (accessToken: string, refreshToken: string, idToken: string) => {
   localStorage.setItem('accessToken', accessToken);
   localStorage.setItem('refreshToken', refreshToken);
   localStorage.setItem('idToken', idToken);
+  localStorage.setItem('authType', 'cognito');
 };
 
 /**
- * 認証トークンをクリア
+ * 認証トークンをクリア (Cognito)
  */
 export const clearAuthTokens = () => {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('idToken');
+  localStorage.removeItem('authType');
 };
 
 /**
@@ -110,4 +123,27 @@ export const getAuthTokens = () => {
     refreshToken: localStorage.getItem('refreshToken'),
     idToken: localStorage.getItem('idToken'),
   };
+};
+
+/**
+ * LINE認証情報を設定
+ */
+export const setLineAuth = (lineUserId: string) => {
+  localStorage.setItem('lineUserId', lineUserId);
+  localStorage.setItem('authType', 'line');
+};
+
+/**
+ * LINE認証情報をクリア
+ */
+export const clearLineAuth = () => {
+  localStorage.removeItem('lineUserId');
+  localStorage.removeItem('authType');
+};
+
+/**
+ * 認証タイプを取得
+ */
+export const getAuthType = (): 'cognito' | 'line' | null => {
+  return localStorage.getItem('authType') as 'cognito' | 'line' | null;
 };

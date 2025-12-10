@@ -22,9 +22,58 @@ from common import (
     success_response,
     error_response,
     ValidationError,
+    require_auth,
 )
 
 logger = get_logger(__name__)
+
+# 食品名シノニム（同義語）マッピング
+# 検索語 → 追加で検索する語のリスト
+FOOD_SYNONYMS = {
+    # ご飯・米関連
+    'ご飯': ['めし', '米', 'ごはん', '飯', 'ライス'],
+    'ごはん': ['めし', '米', 'ご飯', '飯', 'ライス'],
+    '白米': ['めし', '精白米', 'ご飯', '米'],
+    '玄米': ['げんまい'],
+    'ライス': ['めし', '米', 'ご飯', '飯'],
+    # パン関連
+    'パン': ['食パン', 'ブレッド'],
+    '食パン': ['パン'],
+    # 麺類
+    'うどん': ['饂飩'],
+    'そば': ['蕎麦', 'ソバ'],
+    'ラーメン': ['らーめん', '拉麺', '中華めん'],
+    'スパゲティ': ['パスタ', 'スパゲッティ'],
+    'パスタ': ['スパゲティ', 'スパゲッティ'],
+    # 肉類
+    '鶏肉': ['とり肉', 'チキン', 'にわとり'],
+    'チキン': ['鶏肉', 'とり肉'],
+    '豚肉': ['ぶた肉', 'ポーク'],
+    '牛肉': ['ビーフ', 'うし肉'],
+    # 野菜
+    'キャベツ': ['きゃべつ'],
+    'トマト': ['とまと'],
+    'にんじん': ['人参', 'ニンジン'],
+    '人参': ['にんじん', 'ニンジン'],
+    'たまねぎ': ['玉ねぎ', '玉葱', 'タマネギ'],
+    '玉ねぎ': ['たまねぎ', '玉葱', 'タマネギ'],
+    'じゃがいも': ['ジャガイモ', '馬鈴薯', 'ばれいしょ'],
+    # 卵・乳製品
+    '卵': ['たまご', 'タマゴ', '鶏卵'],
+    'たまご': ['卵', 'タマゴ', '鶏卵'],
+    '牛乳': ['ミルク', '乳'],
+    'ミルク': ['牛乳', '乳'],
+    'チーズ': ['ちーず'],
+    # 魚介類
+    '鮭': ['さけ', 'サケ', 'シャケ', 'サーモン'],
+    'さけ': ['鮭', 'サケ', 'シャケ', 'サーモン'],
+    'サーモン': ['鮭', 'さけ', 'サケ'],
+    'まぐろ': ['マグロ', '鮪', 'ツナ'],
+    'ツナ': ['まぐろ', 'マグロ', '鮪'],
+    # 豆類
+    '豆腐': ['とうふ', 'トウフ'],
+    '納豆': ['なっとう'],
+}
 
 
 class FoodSearchHandler:
@@ -40,6 +89,9 @@ class FoodSearchHandler:
         """
         食品名で検索
 
+        シノニム（同義語）も含めて検索する。
+        例: 「ご飯」で検索 → 「めし」「米」「ごはん」なども検索
+
         Args:
             query: 検索クエリ（食品名）
             limit: 最大結果数
@@ -48,16 +100,40 @@ class FoodSearchHandler:
             検索結果のリスト
         """
         try:
-            # DynamoDB検索（部分一致）
+            # 検索語リストを作成（元のクエリ + シノニム）
+            search_terms = [query]
+            if query in FOOD_SYNONYMS:
+                search_terms.extend(FOOD_SYNONYMS[query])
+
+            logger.info(f"Searching with terms: {search_terms}")
+
+            # 複数の検索語で OR 検索
+            # DynamoDB の FilterExpression で複数条件を OR で結合
+            filter_parts = []
+            expression_values = {}
+
+            for i, term in enumerate(search_terms):
+                filter_parts.append(f'contains(food_name, :query{i})')
+                expression_values[f':query{i}'] = term
+
+            filter_expression = ' OR '.join(filter_parts)
+
             items = self.dynamodb.scan(
-                filter_expression='contains(food_name, :query)',
-                expression_attribute_values={
-                    ':query': query
-                },
+                filter_expression=filter_expression,
+                expression_attribute_values=expression_values,
                 limit=limit
             )
 
-            return [self._convert_item(item) for item in items]
+            # 重複除去（food_id ベース）
+            seen_ids = set()
+            unique_items = []
+            for item in items:
+                food_id = item.get('food_id')
+                if food_id not in seen_ids:
+                    seen_ids.add(food_id)
+                    unique_items.append(item)
+
+            return [self._convert_item(item) for item in unique_items[:limit]]
 
         except Exception as e:
             logger.error(f"食品名検索エラー: {str(e)}", exc_info=True)
@@ -113,9 +189,13 @@ class FoodSearchHandler:
         }
 
 
+@require_auth
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda ハンドラー
+
+    認証: Cognito トークンまたは LINE User ID が必要
+    認証成功時、event["auth_user"] に認証ユーザー情報が追加される
 
     期待されるイベント:
     {

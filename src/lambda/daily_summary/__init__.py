@@ -27,7 +27,8 @@ from common import (
     validate_date_format,
     get_logger,
     success_response,
-    error_response
+    error_response,
+    require_auth,
 )
 
 logger = get_logger(__name__)
@@ -55,9 +56,13 @@ MAX_ADVICE_LENGTH = 300  # 要件: 10.7
 ADVICE_USAGE_TTL_DAYS = 30  # 要件: 10.9
 
 
+@require_auth
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda関数のメインハンドラー
+
+    認証: Cognito トークンまたは LINE User ID が必要
+    認証成功時、event["auth_user"] に認証ユーザー情報が追加される
 
     Args:
         event: API Gatewayイベント
@@ -110,8 +115,14 @@ def generate_daily_advice(event: Dict[str, Any]) -> Dict[str, Any]:
     # リクエストボディを解析
     body = json.loads(event.get("body", "{}"))
 
-    # バリデーション
-    user_id = body.get("user_id")
+    # 認証済みユーザーIDを取得（優先）
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+
+    # フォールバック: リクエストボディから取得（内部呼び出し用）
+    if not user_id:
+        user_id = body.get("user_id")
+
     advice_date_str = body.get("date")
 
     validate_required(user_id, "user_id")

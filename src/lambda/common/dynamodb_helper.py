@@ -348,16 +348,21 @@ class DynamoDBHelper:
         filter_expression: Optional[str] = None,
         expression_attribute_values: Optional[Dict[str, Any]] = None,
         expression_attribute_names: Optional[Dict[str, str]] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        max_pages: int = 10
     ) -> List[Dict[str, Any]]:
         """
         テーブルをスキャンする
+
+        ページネーションを使用してフィルタ条件に一致するアイテムを取得する。
+        limit は「結果として取得したいアイテム数」として扱われる。
 
         Args:
             filter_expression: フィルタ式
             expression_attribute_values: 式の属性値
             expression_attribute_names: 式の属性名
-            limit: 取得する最大アイテム数
+            limit: 取得する最大アイテム数（フィルタ適用後の結果数）
+            max_pages: 最大ページネーション回数（デフォルト10）
 
         Returns:
             取得されたアイテムのリスト
@@ -378,26 +383,45 @@ class DynamoDBHelper:
             if expression_attribute_names:
                 scan_params["ExpressionAttributeNames"] = expression_attribute_names
 
-            if limit:
-                scan_params["Limit"] = limit
+            # ページネーションで結果を収集
+            all_items = []
+            pages_scanned = 0
+            last_evaluated_key = None
 
-            response = self.table.scan(**scan_params)
-            items = response.get("Items", [])
+            while pages_scanned < max_pages:
+                if last_evaluated_key:
+                    scan_params["ExclusiveStartKey"] = last_evaluated_key
+
+                response = self.table.scan(**scan_params)
+                items = response.get("Items", [])
+                all_items.extend(items)
+                pages_scanned += 1
+
+                # limit に達したら終了
+                if limit and len(all_items) >= limit:
+                    all_items = all_items[:limit]
+                    break
+
+                # 次のページがなければ終了
+                last_evaluated_key = response.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
 
             # Decimalをfloatに変換
-            items = [self._convert_decimals_to_float(item) for item in items]
+            all_items = [self._convert_decimals_to_float(item) for item in all_items]
 
             logger.info(
                 f"スキャンを実行しました: {self.table_name}",
                 extra={
                     "extra_data": {
                         "table": self.table_name,
-                        "count": len(items)
+                        "count": len(all_items),
+                        "pages_scanned": pages_scanned
                     }
                 }
             )
 
-            return items
+            return all_items
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")

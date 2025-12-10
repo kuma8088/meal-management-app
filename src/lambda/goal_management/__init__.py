@@ -28,7 +28,8 @@ from common import (
     ResourceNotFoundError,
     get_logger,
     success_response,
-    error_response
+    error_response,
+    require_auth,
 )
 
 logger = get_logger(__name__)
@@ -43,9 +44,13 @@ goals_db = DynamoDBHelper(GOALS_TABLE_NAME, AWS_REGION)
 users_db = DynamoDBHelper(USERS_TABLE_NAME, AWS_REGION)
 
 
+@require_auth
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     API Gatewayからのリクエストを処理する
+
+    認証: Cognito トークンまたは LINE User ID が必要
+    認証成功時、event["auth_user"] に認証ユーザー情報が追加される
 
     Args:
         event: API Gatewayイベント
@@ -73,7 +78,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # ルーティング
         # ユーザープロフィール管理
-        if http_method == "POST" and path == "/users":
+        if http_method == "GET" and path == "/users/me":
+            # 認証ユーザー自身のプロフィールを取得
+            return get_current_user_profile(event)
+        elif http_method == "POST" and path == "/users":
             return create_user_profile(event)
         elif http_method == "GET" and path_parameters.get("user_id") and "goals" not in path:
             return get_user_profile(event)
@@ -122,17 +130,14 @@ def create_goal(event: Dict[str, Any]) -> Dict[str, Any]:
 
     要件: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6
     """
+    # 認証ユーザーからuser_idを取得
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+    if not user_id:
+        raise ValidationError("認証が必要です", details={"field": "user_id"})
+
     # リクエストボディを解析
     body = json.loads(event.get("body", "{}"))
-
-    # 必須フィールドのバリデーション
-    user_id = body.get("user_id")
-    if not user_id:
-        raise ValidationError("user_idは必須です", details={"field": "user_id"})
-
-    current_weight = body.get("current_weight")
-    if current_weight is None:
-        raise ValidationError("current_weightは必須です", details={"field": "current_weight"})
 
     target_weight = body.get("target_weight")
     if target_weight is None:
@@ -164,13 +169,24 @@ def create_goal(event: Dict[str, Any]) -> Dict[str, Any]:
             details={"goal_type": goal_type_str}
         )
 
-    # ユーザー情報を取得してTDEEを取得
+    # ユーザー情報を取得してTDEEとcurrent_weightを取得
     user_data = users_db.get_item({"user_id": user_id})
     if not user_data:
         raise ResourceNotFoundError(
             f"ユーザーID {user_id} が見つかりません",
             details={"user_id": user_id}
         )
+
+    # current_weightはオプション（指定がなければプロフィールから取得）
+    current_weight = body.get("current_weight")
+    if current_weight is None:
+        current_weight = user_data.get("weight")
+        if current_weight is None:
+            raise ValidationError(
+                "current_weightが指定されておらず、プロフィールにも体重が設定されていません",
+                details={"user_id": user_id}
+            )
+        logger.info(f"current_weightをプロフィールから取得: {current_weight}kg")
 
     tdee = user_data.get("tdee", 0.0)
     if tdee <= 0:
@@ -226,6 +242,10 @@ def create_goal(event: Dict[str, Any]) -> Dict[str, Any]:
     # レスポンスを作成
     response_data = {
         "goal_id": goal_id,
+        "goal_type": goal_type.value,
+        "current_weight": float(current_weight),
+        "target_weight": float(target_weight),
+        "target_date": target_date.isoformat(),
         "daily_calorie_adjustment": goal_calculation["daily_calorie_adjustment"],
         "target_calories": goal_calculation["target_calories"],
         "recommended_protein": goal_calculation["recommended_protein"],
@@ -630,6 +650,60 @@ def get_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
     return success_response(user_data)
 
 
+def get_current_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    認証ユーザー自身のプロフィールを取得する (GET /users/me)
+
+    @require_auth デコレータにより、event["auth_user"] に認証情報が設定されている
+
+    Args:
+        event: API Gatewayイベント
+
+    Returns:
+        API Gatewayレスポンス
+    """
+    auth_user = event.get("auth_user", {})
+    user_id = auth_user.get("user_id")
+
+    if not user_id:
+        raise ValidationError(
+            "認証情報からユーザーIDを取得できませんでした",
+            details={"auth_user": auth_user}
+        )
+
+    # DynamoDBからユーザープロフィールを取得
+    user_data = users_db.get_item({"user_id": user_id})
+
+    if not user_data:
+        # ユーザーが存在しない場合、LINE User ID があれば基本情報を返す
+        line_user_id = auth_user.get("line_user_id")
+        if line_user_id:
+            # LINEユーザーの場合、基本的なプロフィール情報を返す
+            user_data = {
+                "user_id": user_id,
+                "line_user_id": line_user_id,
+                "auth_type": "line",
+                "profile_complete": False,
+            }
+            logger.info(
+                f"LINEユーザーの基本情報を返します: {user_id}",
+                extra={"extra_data": {"user_id": user_id, "line_user_id": line_user_id}}
+            )
+            return success_response(user_data)
+
+        raise ResourceNotFoundError(
+            f"ユーザープロフィール {user_id} が見つかりません",
+            details={"user_id": user_id}
+        )
+
+    logger.info(
+        f"認証ユーザーのプロフィールを取得しました: {user_id}",
+        extra={"extra_data": {"user_id": user_id}}
+    )
+
+    return success_response(user_data)
+
+
 def update_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     ユーザープロフィールを更新する (PUT /users/{user_id})
@@ -652,12 +726,82 @@ def update_user_profile(event: Dict[str, Any]) -> Dict[str, Any]:
     # 既存のユーザープロフィールを取得
     existing_user_data = users_db.get_item({"user_id": user_id})
 
-    if not existing_user_data:
-        raise ResourceNotFoundError(
-            f"ユーザープロフィール {user_id} が見つかりません",
-            details={"user_id": user_id}
+    # プロフィールが存在しないか、不完全な場合（LINE認証で作成された初期状態）
+    # 新規プロフィール作成として処理
+    is_new_profile = (
+        not existing_user_data or
+        not existing_user_data.get("age") or
+        not existing_user_data.get("height") or
+        not existing_user_data.get("weight")
+    )
+
+    if is_new_profile:
+        # 新規プロフィール作成として処理
+        logger.info(f"ユーザー {user_id} のプロフィールを新規作成します")
+
+        # 必須フィールドのバリデーション
+        age = body.get("age")
+        if age is None:
+            raise ValidationError("ageは必須です", details={"field": "age"})
+
+        gender_str = body.get("gender")
+        if not gender_str:
+            raise ValidationError("genderは必須です", details={"field": "gender"})
+
+        height = body.get("height")
+        if height is None:
+            raise ValidationError("heightは必須です", details={"field": "height"})
+
+        weight = body.get("weight")
+        if weight is None:
+            raise ValidationError("weightは必須です", details={"field": "weight"})
+
+        activity_level_str = body.get("activity_level")
+        if not activity_level_str:
+            raise ValidationError("activity_levelは必須です", details={"field": "activity_level"})
+
+        # genderとactivity_levelの変換
+        try:
+            gender = Gender(gender_str)
+        except ValueError:
+            raise ValidationError(
+                f"無効なgender: {gender_str}（male または female を指定してください）",
+                details={"gender": gender_str}
+            )
+
+        try:
+            activity_level = ActivityLevel(activity_level_str)
+        except ValueError:
+            raise ValidationError(
+                f"無効なactivity_level: {activity_level_str}",
+                details={"activity_level": activity_level_str}
+            )
+
+        # 既存データからLINE User IDを引き継ぐ
+        line_user_id = existing_user_data.get("line_user_id") if existing_user_data else None
+
+        # プロフィールを作成
+        user = ProfileManager.create_profile(
+            user_id=user_id,
+            age=int(age),
+            height=float(height),
+            weight=float(weight),
+            gender=gender,
+            activity_level=activity_level,
+            line_user_id=line_user_id
         )
 
+        # DynamoDBに保存
+        users_db.put_item(user.to_dict())
+
+        logger.info(
+            f"ユーザープロフィールを作成しました: {user_id}",
+            extra={"extra_data": {"user_id": user_id}}
+        )
+
+        return success_response(user.to_dict(), status_code=201)
+
+    # 既存プロフィールの更新
     # Userオブジェクトを復元
     user = User.from_dict(existing_user_data)
 

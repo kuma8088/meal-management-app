@@ -20,10 +20,12 @@ export const createMeal = async (data: CreateMealRequest): Promise<Meal> => {
 
 /**
  * 食事記録一覧を取得
+ *
+ * APIレスポンス形式: { meals: [...], count: N, has_more: bool }
  */
 export const getMeals = async (params?: GetMealsParams): Promise<Meal[]> => {
-  const response = await apiClient.get<Meal[]>('/meals', { params });
-  return response.data;
+  const response = await apiClient.get<{ meals: Meal[]; count: number; has_more: boolean }>('/meals', { params });
+  return response.data.meals;
 };
 
 /**

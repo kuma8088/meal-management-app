@@ -52,7 +52,8 @@ class GoalType(str, Enum):
 
 class FoodSource(str, Enum):
     """食品データソース"""
-    STANDARD = "STANDARD"  # 日本食品標準成分表
+    STANDARD = "STANDARD"  # 日本食品標準成分表（大文字形式）
+    JAPANESE_STANDARD = "japanese_standard"  # 日本食品標準成分表（小文字形式、DB互換用）
     OPEN_FOOD_FACTS = "OPEN_FOOD_FACTS"  # Open Food Facts
     AI_GENERATED = "AI_GENERATED"  # AI生成
 
@@ -160,18 +161,27 @@ class User:
     @classmethod
     def from_dict(cls, data: dict) -> "User":
         """辞書からインスタンスを作成"""
+        data = data.copy()
+
         # Enum型への変換
         if "gender" in data and isinstance(data["gender"], str):
             data["gender"] = Gender(data["gender"])
         if "activity_level" in data and isinstance(data["activity_level"], str):
             data["activity_level"] = ActivityLevel(data["activity_level"])
-        
+
         # 日時型への変換
         if "created_at" in data and isinstance(data["created_at"], str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
         if "updated_at" in data and isinstance(data["updated_at"], str):
             data["updated_at"] = datetime.fromisoformat(data["updated_at"])
-        
+
+        # 無効なフィールドを除去（DynamoDB に存在するがモデルに定義されていないフィールド）
+        valid_fields = {
+            'user_id', 'age', 'height', 'weight', 'gender', 'activity_level',
+            'bmr', 'tdee', 'line_user_id', 'cognito_user_id', 'created_at', 'updated_at'
+        }
+        data = {k: v for k, v in data.items() if k in valid_fields}
+
         return cls(**data)
 
 
@@ -179,41 +189,69 @@ class User:
 class MealFood:
     """
     食事に含まれる食品
-    
+
     Attributes:
         food_id: 食品ID
         amount: 量（グラム）
+        name: 食品名（表示用）
+        unit: 単位（g, ml, 個など）
+        calories: カロリー（計算済み）
+        protein: タンパク質（計算済み）
+        fat: 脂質（計算済み）
+        carbs: 炭水化物（計算済み）
     """
     food_id: str
     amount: float
-    
+    name: Optional[str] = None
+    unit: str = "g"
+    calories: Optional[float] = None
+    protein: Optional[float] = None
+    fat: Optional[float] = None
+    carbs: Optional[float] = None
+
     def __post_init__(self):
         """初期化後のバリデーション"""
         self.validate()
-    
+
     def validate(self) -> None:
         """食品データのバリデーション"""
         validate_required(self.food_id, "food_id")
         validate_positive_number(self.amount, "amount")
-    
+
     def to_dict(self) -> dict:
         """辞書形式に変換"""
-        return {
+        result = {
             "food_id": self.food_id,
-            "amount": self.amount
+            "amount": self.amount,
+            "unit": self.unit,
         }
-    
+        # オプションフィールドは値がある場合のみ追加
+        if self.name is not None:
+            result["name"] = self.name
+        if self.calories is not None:
+            result["calories"] = self.calories
+        if self.protein is not None:
+            result["protein"] = self.protein
+        if self.fat is not None:
+            result["fat"] = self.fat
+        if self.carbs is not None:
+            result["carbs"] = self.carbs
+        return result
+
     @classmethod
     def from_dict(cls, data: dict) -> "MealFood":
         """辞書からインスタンスを作成"""
-        return cls(**data)
+        # 有効なフィールドのみを抽出
+        valid_fields = {'food_id', 'amount', 'name', 'unit', 'calories', 'protein', 'fat', 'carbs'}
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered_data)
 
 
 @dataclass
 class Meal:
     """
     食事記録モデル
-    
+
     Attributes:
         meal_id: 食事記録ID
         user_id: ユーザーID
@@ -225,6 +263,7 @@ class Meal:
         total_carbs: 総炭水化物（g）
         timestamp: タイムスタンプ
         created_at: 作成日時
+        updated_at: 更新日時
     """
     meal_id: str
     user_id: str
@@ -236,12 +275,15 @@ class Meal:
     total_carbs: float
     timestamp: datetime
     created_at: Optional[datetime] = None
-    
+    updated_at: Optional[datetime] = None
+
     def __post_init__(self):
         """初期化後のバリデーション"""
         # デフォルト値の設定
         if self.created_at is None:
             self.created_at = datetime.utcnow()
+        if self.updated_at is None:
+            self.updated_at = datetime.utcnow()
         
         # MealFoodオブジェクトへの変換
         if self.foods and isinstance(self.foods[0], dict):
@@ -283,29 +325,42 @@ class Meal:
             "total_fat": self.total_fat,
             "total_carbs": self.total_carbs,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
     
     @classmethod
     def from_dict(cls, data: dict) -> "Meal":
         """辞書からインスタンスを作成"""
+        data = data.copy()
+
         # Enum型への変換
         if "meal_type" in data and isinstance(data["meal_type"], str):
             data["meal_type"] = MealType(data["meal_type"])
-        
+
         # 日時型への変換
         if "timestamp" in data and isinstance(data["timestamp"], str):
             data["timestamp"] = datetime.fromisoformat(data["timestamp"])
         if "created_at" in data and isinstance(data["created_at"], str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
-        
+        if "updated_at" in data and isinstance(data["updated_at"], str):
+            data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+
         # MealFoodオブジェクトへの変換
         if "foods" in data and data["foods"]:
             data["foods"] = [
                 MealFood.from_dict(f) if isinstance(f, dict) else f
                 for f in data["foods"]
             ]
-        
+
+        # 有効なフィールドのみを抽出（DynamoDB のメタフィールドを除去）
+        valid_fields = {
+            'meal_id', 'user_id', 'meal_type', 'foods',
+            'total_calories', 'total_protein', 'total_fat', 'total_carbs',
+            'timestamp', 'created_at', 'updated_at'
+        }
+        data = {k: v for k, v in data.items() if k in valid_fields}
+
         return cls(**data)
 
 
@@ -376,16 +431,38 @@ class Food:
     @classmethod
     def from_dict(cls, data: dict) -> "Food":
         """辞書からインスタンスを作成"""
+        # データのコピーを作成（元のdictを変更しない）
+        data = data.copy()
+
+        # DB フィールド名からモデルフィールド名へのマッピング
+        field_mapping = {
+            'food_name': 'name',
+            'calories': 'calories_per_100g',
+            'protein': 'protein_per_100g',
+            'fat': 'fat_per_100g',
+            'carbs': 'carbs_per_100g',
+        }
+
+        for db_field, model_field in field_mapping.items():
+            if db_field in data and model_field not in data:
+                data[model_field] = data.pop(db_field)
+
+        # 不要なフィールドを除去（モデルに存在しないフィールド）
+        valid_fields = {'food_id', 'name', 'calories_per_100g', 'protein_per_100g',
+                        'fat_per_100g', 'carbs_per_100g', 'jan_code', 'source',
+                        'created_at', 'updated_at'}
+        data = {k: v for k, v in data.items() if k in valid_fields}
+
         # Enum型への変換
         if "source" in data and isinstance(data["source"], str):
             data["source"] = FoodSource(data["source"])
-        
+
         # 日時型への変換
         if "created_at" in data and isinstance(data["created_at"], str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
         if "updated_at" in data and isinstance(data["updated_at"], str):
             data["updated_at"] = datetime.fromisoformat(data["updated_at"])
-        
+
         return cls(**data)
 
 

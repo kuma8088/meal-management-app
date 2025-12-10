@@ -76,6 +76,14 @@ from .ai_food_search import AIFoodSearch
 from .food_parser import StandardFoodParser, OpenFoodFactsClient, FoodMasterImporter
 from .barcode_recognition import BarcodeRecognition
 
+from .auth import (
+    authenticate,
+    verify_cognito_token,
+    verify_line_user_id,
+    require_auth,
+    unauthorized_response,
+)
+
 __all__ = [
     # Exceptions
     "AppException",
@@ -151,4 +159,11 @@ __all__ = [
     "StandardFoodParser",
     "OpenFoodFactsClient",
     "FoodMasterImporter",
+
+    # Authentication
+    "authenticate",
+    "verify_cognito_token",
+    "verify_line_user_id",
+    "require_auth",
+    "unauthorized_response",
 ]

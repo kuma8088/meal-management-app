@@ -181,7 +181,7 @@ const MealsPage: React.FC = () => {
           </div>
         )}
 
-        <MealsList meals={meals} loading={loading} />
+        <MealsList meals={meals} loading={loading} onDeleteSuccess={handleReload} />
       </div>
     </div>
   );
