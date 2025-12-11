@@ -3,9 +3,10 @@ version: 0.1
 # Device Farm Test Specification for Meal Management App
 # Playwright E2E テストをDevice Farm上で実行する構成
 
-# Android/iOS デバイスのテストホスト指定（必須）
+# Android デバイスのテストホスト指定
+# Note: iOS テストは削除済み（Web アプリには不要）
+# 詳細: docs/99_DeviceFarm_Usecase.md
 android_test_host: amazon_linux_2
-ios_test_host: macos_sequoia
 
 phases:
   # 準備フェーズ: 依存関係のインストールとPlaywrightブラウザセットアップ
