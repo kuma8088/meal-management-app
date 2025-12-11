@@ -36,8 +36,7 @@ phases:
       - test -d playwright-report && zip -r test-results.zip playwright-report || echo "No test reports found"
       - test -d test-results && zip -r test-results-json.zip test-results || echo "No JSON results found"
 
-# アーティファクト設定 - Device Farm形式（シンプルなパス配列）
+# アーティファクト設定 - Device Farm形式（シンプルなパス配列のみ、変数・ワイルドカード不可）
 artifacts:
-  - $DEVICEFARM_LOG_DIR
   - playwright-report
   - test-results
