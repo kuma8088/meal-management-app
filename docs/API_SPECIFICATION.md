@@ -19,27 +19,7 @@ Authorization: Bearer <id_token>
 
 ### ユーザープロフィール
 
-#### GET /users/{user_id}/profile
-
-ユーザープロフィールを取得
-
-**レスポンス (200)**:
-```json
-{
-  "user_id": "string",
-  "age": 30,
-  "height": 170.0,
-  "weight": 65.0,
-  "gender": "male",
-  "activity_level": "moderate",
-  "bmr": 1600.5,
-  "tdee": 2480.8,
-  "created_at": "2025-01-01T00:00:00Z",
-  "updated_at": "2025-01-01T00:00:00Z"
-}
-```
-
-#### POST /users/{user_id}/profile
+#### POST /users
 
 ユーザープロフィールを作成
 
@@ -61,7 +41,27 @@ Authorization: Bearer <id_token>
 - `active`: 活発な運動（係数 1.725）
 - `very_active`: 非常に活発（係数 1.9）
 
-#### PUT /users/{user_id}/profile
+#### GET /users/{user_id}
+
+ユーザープロフィールを取得
+
+**レスポンス (200)**:
+```json
+{
+  "user_id": "string",
+  "age": 30,
+  "height": 170.0,
+  "weight": 65.0,
+  "gender": "male",
+  "activity_level": "moderate",
+  "bmr": 1600.5,
+  "tdee": 2480.8,
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z"
+}
+```
+
+#### PUT /users/{user_id}
 
 ユーザープロフィールを更新（BMR/TDEE 自動再計算）
 
@@ -102,17 +102,22 @@ Authorization: Bearer <id_token>
 - `japanese_standard`: 日本食品標準成分表
 - `AI_GENERATED`: AI検索結果（キャッシュ）
 
+#### GET /foods/{food_id}
+
+食品詳細を取得
+
 ---
 
 ### 食事記録
 
-#### POST /users/{user_id}/meals
+#### POST /meals
 
 食事記録を作成
 
 **リクエスト**:
 ```json
 {
+  "user_id": "uuid",
   "meal_type": "lunch",
   "foods": [
     {
@@ -130,20 +135,25 @@ Authorization: Bearer <id_token>
 - `dinner`: 夕食
 - `snack`: 間食
 
-#### GET /users/{user_id}/meals
+#### GET /meals
 
 食事記録一覧を取得
 
 **クエリパラメータ**:
+- `user_id` (必須): ユーザーID
 - `start_date`: 開始日 (YYYY-MM-DD)
 - `end_date`: 終了日 (YYYY-MM-DD)
 - `limit`: 最大件数 (デフォルト: 50)
 
-#### PUT /users/{user_id}/meals/{meal_id}
+#### GET /meals/{meal_id}
+
+特定の食事記録を取得
+
+#### PUT /meals/{meal_id}
 
 食事記録を更新
 
-#### DELETE /users/{user_id}/meals/{meal_id}
+#### DELETE /meals/{meal_id}
 
 食事記録を削除
 
@@ -151,13 +161,14 @@ Authorization: Bearer <id_token>
 
 ### 体重目標
 
-#### POST /users/{user_id}/goals
+#### POST /goals
 
 体重目標を作成
 
 **リクエスト**:
 ```json
 {
+  "user_id": "uuid",
   "goal_type": "lose",
   "target_weight": 60.0,
   "target_date": "2025-06-01"
@@ -186,17 +197,25 @@ Authorization: Bearer <id_token>
 }
 ```
 
-#### GET /users/{user_id}/goals
+#### GET /goals/{goal_id}
 
 目標を取得
+
+#### GET /users/{user_id}/goals
+
+ユーザーの目標一覧を取得
 
 ---
 
 ### 1日の総評
 
-#### GET /users/{user_id}/summary/{date}
+#### GET /advice/daily
 
 1日の食事サマリーとAIアドバイスを取得
+
+**クエリパラメータ**:
+- `user_id` (必須): ユーザーID
+- `date` (必須): 日付 (YYYY-MM-DD)
 
 **レスポンス (200)**:
 ```json
@@ -213,6 +232,37 @@ Authorization: Bearer <id_token>
     "used": 1,
     "limit": 2
   }
+}
+```
+
+---
+
+### LINE Webhook
+
+#### POST /line/webhook
+
+LINE Messaging API からの Webhook を受信
+
+- 署名検証で認証（LINE Channel Secret を使用）
+- リクエストボディは LINE プラットフォームからの Webhook イベント
+
+---
+
+### テストユーザー管理（開発環境のみ）
+
+#### GET /test-users
+
+E2E テスト用のテストユーザー一覧を取得
+
+**レスポンス (200)**:
+```json
+{
+  "users": [
+    {
+      "email": "e2e-test@example.com",
+      "user_id": "uuid"
+    }
+  ]
 }
 ```
 

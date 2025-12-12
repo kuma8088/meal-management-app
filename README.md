@@ -12,9 +12,11 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 - **認証**: Amazon Cognito, LINE LIFF (LINE Front-end Framework)
 - **AI**: Amazon Bedrock (Claude 3)
 - **CDN**: Amazon CloudFront
+- **スケジューラ**: Amazon EventBridge (定期実行タスク)
 - **画像認識**: Amazon Rekognition / Amazon Textract
 - **メッセージング**: LINE Messaging API
 - **ロギング**: Amazon CloudWatch Logs
+- **E2Eテスト**: AWS Device Farm (モバイルブラウザテスト)
 - **フロントエンド**: React (TypeScript)
 
 ## プロジェクト構成
@@ -27,8 +29,11 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 │   ├── dynamodb.tf        # DynamoDBテーブル定義
 │   ├── s3.tf              # S3バケット定義
 │   ├── cognito.tf         # Cognito User Pool定義
+│   ├── cloudfront.tf      # CloudFront CDN定義
 │   ├── iam.tf             # IAMロールとポリシー定義
 │   ├── api_gateway.tf     # API Gateway定義
+│   ├── eventbridge.tf     # EventBridgeスケジュール定義
+│   ├── device-farm.tf     # AWS Device Farm設定
 │   ├── monitoring.tf      # CloudWatch監視設定
 │   └── outputs.tf         # 出力定義
 ├── src/
@@ -37,26 +42,48 @@ AWS サーバレスアーキテクチャを活用した食事管理アプリケ�
 │       │   └── auth.py    # 認証ヘルパー（Cognito/LINE両対応）
 │       ├── authorizer/    # API Gateway Lambda Authorizer
 │       ├── line_handler/  # LINE Webhook Handler
-│       ├── meal_registration/  # 食事登録
+│       ├── meal_registration/  # 食事登録・ユーザー管理
 │       ├── food_search/   # 食品検索
 │       ├── daily_summary/ # 1日の総評とAIアドバイス
-│       └── goal_management/  # 体重目標管理
+│       ├── goal_management/  # 体重目標管理
+│       ├── weekly_report/ # 週次レポート生成
+│       ├── food_master_import/  # 食品マスタインポート
+│       └── test_user_management/  # テストユーザー管理
 ├── frontend/              # Reactフロントエンド
 │   ├── src/              # ソースコード
 │   │   ├── api/          # APIクライアント
+│   │   ├── assets/       # 静的アセット
 │   │   ├── components/   # UIコンポーネント
 │   │   ├── contexts/     # Reactコンテキスト
 │   │   │   ├── AuthContext.tsx   # Cognito認証
 │   │   │   └── LiffContext.tsx   # LINE LIFF認証
+│   │   ├── hooks/        # カスタムフック
 │   │   ├── pages/        # ページコンポーネント
-│   │   └── types/        # TypeScript型定義
+│   │   ├── types/        # TypeScript型定義
+│   │   └── utils/        # ユーティリティ関数
 │   ├── e2e/              # E2Eテスト（Playwright）
+│   │   ├── auth.spec.ts           # 認証テスト
+│   │   ├── critical-path.spec.ts  # クリティカルパステスト
+│   │   ├── food-search.spec.ts    # 食品検索テスト
+│   │   ├── goals.spec.ts          # 目標管理テスト
+│   │   ├── meal-registration.spec.ts  # 食事登録テスト
+│   │   ├── meals.spec.ts          # 食事一覧テスト
+│   │   ├── profile.spec.ts        # プロフィールテスト
+│   │   └── summary.spec.ts        # サマリーテスト
 │   └── package.json      # npm設定
-├── tests/                 # Pythonテスト
-│   ├── unit/             # ユニットテスト
-│   ├── integration/      # 統合テスト
-│   └── property/         # プロパティベーステスト
+├── tests/                 # Pythonテスト（ユニット/統合/プロパティ）
+│   ├── conftest.py       # 共通フィクスチャ
+│   └── test_*.py         # テストファイル群
 ├── scripts/               # ユーティリティスクリプト
+├── docs/                  # ドキュメント
+│   ├── ARCHITECTURE.md   # アーキテクチャ概要
+│   ├── API_SPECIFICATION.md  # API仕様書
+│   ├── DEPLOYMENT.md     # デプロイ手順
+│   ├── DEVICE_FARM_SETUP.md  # Device Farm設定ガイド
+│   └── USER_TEST_GUIDE.md    # ユーザーテストガイド
+├── .github/
+│   └── workflows/        # GitHub Actions
+│       └── device-farm.yml  # Device Farm E2Eテストワークフロー
 └── README.md
 ```
 

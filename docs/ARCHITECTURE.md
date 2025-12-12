@@ -16,7 +16,12 @@ meal-management-app/
 │   ├── dynamodb.tf               # DynamoDBテーブル定義
 │   ├── s3.tf                     # S3バケット定義
 │   ├── cognito.tf                # Cognito User Pool定義
+│   ├── cloudfront.tf             # CloudFront CDN定義
 │   ├── iam.tf                    # IAMロールとポリシー定義
+│   ├── api_gateway.tf            # API Gateway定義
+│   ├── eventbridge.tf            # EventBridgeスケジュール定義
+│   ├── device-farm.tf            # AWS Device Farm設定
+│   ├── monitoring.tf             # CloudWatch監視設定
 │   ├── outputs.tf                # 出力定義
 │   └── terraform.tfvars.example  # 変数設定例
 ├── src/
@@ -24,27 +29,34 @@ meal-management-app/
 │       ├── common/               # 共通ライブラリ
 │       │   ├── __init__.py
 │       │   ├── dynamodb_helper.py
-│       │   ├── s3_helper.py
+│       │   ├── auth.py           # 認証ヘルパー（Cognito/LINE両対応）
 │       │   ├── validation.py
 │       │   └── error_handling.py
+│       ├── authorizer/           # API Gateway Lambda Authorizer
 │       ├── line_handler/         # LINE Webhook Handler
-│       ├── meal_registration/    # 食事登録
+│       ├── meal_registration/    # 食事登録・ユーザー管理
 │       ├── food_search/          # 食品検索
-│       ├── barcode_recognition/  # バーコード認識
-│       ├── nutrition_calculation/ # 栄養計算
-│       ├── bmr_tdee_calculation/ # BMR/TDEE計算
 │       ├── goal_management/      # 目標管理
-│       ├── daily_summary_advice/ # 総評とアドバイス
-│       ├── user_profile_management/ # ユーザープロフィール管理
-│       └── food_master_import/   # 食品マスタインポート
-├── tests/                        # テスト
+│       ├── daily_summary/        # 1日の総評とAIアドバイス
+│       ├── weekly_report/        # 週次レポート生成（EventBridge起動）
+│       ├── food_master_import/   # 食品マスタインポート
+│       └── test_user_management/ # テストユーザー管理
+├── frontend/                     # Reactフロントエンド
+│   ├── src/                     # ソースコード
+│   ├── e2e/                     # E2Eテスト（Playwright）
+│   └── package.json
+├── tests/                        # Pythonテスト
 │   ├── __init__.py
 │   ├── conftest.py              # 共通フィクスチャ
-│   ├── unit/                    # ユニットテスト
-│   ├── integration/             # 統合テスト
-│   └── property/                # プロパティベーステスト
+│   └── test_*.py                # ユニット/統合/プロパティテスト
 ├── docs/                        # ドキュメント
-│   └── ARCHITECTURE.md
+│   ├── ARCHITECTURE.md          # アーキテクチャ概要
+│   ├── API_SPECIFICATION.md     # API仕様書
+│   ├── DEPLOYMENT.md            # デプロイ手順
+│   └── USER_TEST_GUIDE.md       # ユーザーテストガイド
+├── .github/
+│   └── workflows/               # GitHub Actions
+│       └── device-farm.yml      # Device Farm E2Eテスト
 ├── .gitignore
 ├── README.md
 ├── Makefile
@@ -199,6 +211,41 @@ Resource = "arn:aws:lambda:${region}:*:function:${project}-${env}-*"
 - IAM 最小権限の原則に従ったロール設定
 - Cognito User Pool でユーザー存在エラーの防止を有効化
 - 本番環境で Cognito 削除保護を有効化
+
+## CloudFront CDN
+
+フロントエンドの配信に CloudFront を使用:
+
+- **オリジン**: S3 frontend バケット
+- **SSL/TLS**: AWS Certificate Manager (ACM) 証明書
+- **キャッシュ**: 静的アセットのキャッシュ
+- **OAI**: Origin Access Identity によるS3直接アクセス防止
+
+## EventBridge スケジュール
+
+定期実行タスクに EventBridge を使用:
+
+### 週次レポート
+
+- **スケジュール**: 毎週日曜 21:00 (JST)
+- **対象 Lambda**: `weekly_report`
+- **機能**: ユーザーごとの週間栄養摂取サマリーを生成
+
+## E2E テスト環境
+
+### Playwright (ローカル/CI)
+
+- **ブラウザ**: Chromium, Firefox, Webkit
+- **実行環境**: GitHub Actions, ローカル開発環境
+- **用途**: クロスブラウザ互換性テスト
+
+### AWS Device Farm (オプション)
+
+- **対象**: Android デバイス（実機）のみ
+- **用途**: 実機でのレスポンシブ動作確認
+- **注意**: Web アプリのため iOS テストは不要（削除済み）
+
+詳細は [99_DeviceFarm_Usecase.md](99_DeviceFarm_Usecase.md) を参照。
 
 ## 環境分離
 
