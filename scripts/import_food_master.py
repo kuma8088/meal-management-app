@@ -55,17 +55,43 @@ def import_food_master_csv(
     failed_count = 0
     errors = []
 
+    # 日本食品標準成分表のカラムインデックス（0-indexed）
+    # ヘッダー構造: 食品群(0), 食品番号(1), 索引番号(2), 食品名(3), 廃棄率(4),
+    #              エネルギーkJ(5), エネルギーkcal(6), 水分(7), たんぱく質(8), ..., 脂質(10), ..., 炭水化物(13)
+    COL_FOOD_GROUP = 0
+    COL_FOOD_NUMBER = 1
+    COL_FOOD_NAME = 3
+    COL_ENERGY_KCAL = 6  # kJは5、kcalは6
+    COL_PROTEIN = 8
+    COL_FAT = 10
+    COL_CARBS = 13  # 炭水化物
+
+    def parse_decimal(value: str) -> Decimal:
+        """数値をDecimalに変換（括弧付き推定値も対応）"""
+        if not value or not str(value).strip():
+            return Decimal('0')
+        try:
+            clean = str(value).strip().replace('(', '').replace(')', '').replace('Tr', '0').replace('*', '').strip()
+            if clean and clean != '-':
+                return Decimal(clean)
+        except:
+            pass
+        return Decimal('0')
+
     try:
         with open(csv_path, 'r', encoding='utf-8-sig') as csvfile:
-            reader = csv.DictReader(csvfile)
+            reader = csv.reader(csvfile)
 
-            if not reader.fieldnames:
+            # ヘッダー行をスキップ
+            header = next(reader, None)
+            if not header:
                 error_msg = "ヘッダーが見つかりません"
                 print(f"エラー: {error_msg}")
                 return 0, 0, [error_msg]
 
-            print(f"カラム数: {len(reader.fieldnames)}")
-            print(f"ヘッダー: {', '.join(list(reader.fieldnames)[:10])}...")
+            print(f"カラム数: {len(header)}")
+            print(f"ヘッダー: {', '.join(header[:10])}...")
+            print(f"使用カラム: エネルギー(kcal)={COL_ENERGY_KCAL}, たんぱく質={COL_PROTEIN}, 脂質={COL_FAT}, 炭水化物={COL_CARBS}")
 
             row_count = 0
 
@@ -76,55 +102,32 @@ def import_food_master_csv(
                     break
 
                 # 進捗表示
-                if row_count % 10 == 0:
+                if row_count % 100 == 0:
                     print(f"  処理中: {row_count}行 (成功: {imported_count}行)")
 
                 try:
-                    # 食品データを構築
+                    # カラム数チェック
+                    if len(row) < 20:
+                        continue
+
+                    # 食品名が空の場合はスキップ
+                    food_name = str(row[COL_FOOD_NAME]).strip()
+                    if not food_name:
+                        continue
+
+                    # 食品データを構築（インデックスで直接参照）
                     food_item = {
-                        'food_id': str(uuid.uuid4()),  # ユニークID
-                        'food_group': str(row.get('食\u3000品\u3000群', '')).strip() or 'unknown',
-                        'food_number': str(row.get('食\u3000品\u3000番\u3000号', '')).strip() or '',
-                        'food_name': str(row.get('食\u3000品\u3000名', '')).strip() or 'unknown',
+                        'food_id': str(uuid.uuid4()),
+                        'food_group': str(row[COL_FOOD_GROUP]).strip() or 'unknown',
+                        'food_number': str(row[COL_FOOD_NUMBER]).strip() or '',
+                        'food_name': food_name,
                         'source': 'japanese_standard',
-                        'calories': Decimal('0'),  # DynamoDB用Decimal
-                        'protein': Decimal('0'),
-                        'fat': Decimal('0'),
-                        'carbs': Decimal('0'),
+                        'calories': parse_decimal(row[COL_ENERGY_KCAL]),
+                        'protein': parse_decimal(row[COL_PROTEIN]),
+                        'fat': parse_decimal(row[COL_FAT]),
+                        'carbs': parse_decimal(row[COL_CARBS]),
                         'created_at': int(__import__('time').time()),
                     }
-
-                    # 栄養情報を抽出（カラム名が複雑なため、対応するカラムを探す）
-                    for key, value in row.items():
-                        val = None
-                        if value and str(value).strip():
-                            try:
-                                # 括弧（推定値）を削除して変換
-                                clean_value = str(value).strip().replace('(', '').replace(')', '').strip()
-                                if clean_value:
-                                    val = Decimal(clean_value)
-                            except:
-                                val = None
-
-                        # カロリーを探す
-                        if 'エネルギー' in key or 'kcal' in key.lower():
-                            if val is not None:
-                                food_item['calories'] = val
-
-                        # タンパク質を探す
-                        if 'たんぱく質' in key or 'protein' in key.lower():
-                            if val is not None and 'アミノ酸' not in key:
-                                food_item['protein'] = val
-
-                        # 脂質を探す
-                        if '脂質' in key or 'fat' in key.lower():
-                            if val is not None and 'トリアシル' not in key:
-                                food_item['fat'] = val
-
-                        # 炭水化物を探す
-                        if '炭水化物' in key or 'carb' in key.lower():
-                            if val is not None and '利用可能' not in key:
-                                food_item['carbs'] = val
 
                     # DynamoDBに保存
                     table.put_item(Item=food_item)
