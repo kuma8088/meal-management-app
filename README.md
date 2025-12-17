@@ -66,6 +66,7 @@ LINE から手軽に食事を記録し、カロリーと栄養バランスを自
 - **ロギング**: Amazon CloudWatch Logs
 - **E2Eテスト**: AWS Device Farm (モバイルブラウザテスト)
 - **フロントエンド**: React (TypeScript)
+- **AI 開発支援**: Claude Code
 
 ## プロジェクト構成
 
@@ -421,6 +422,16 @@ LINE ユーザーは **Cognito Custom Auth Flow** を通じて認証されます
 3. **スケーラビリティ**: ユーザー増加時も自動対応
 4. **AWS サービス連携**: Cognito, Bedrock, DynamoDB とのネイティブ統合
 5. **Terraform による再現性**: IaC でインフラを完全にコード管理
+
+---
+
+## 作成者
+
+**Naoya Iimura**
+
+ネットワークセールスエンジニア / 個人開発エンジニア / ウェブマーケター
+
+📧 info@kuma8088.com
 
 ---
 
