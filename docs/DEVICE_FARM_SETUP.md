@@ -353,6 +353,5 @@ await page.fill('#field2', 'value2');
 
 ## 関連ドキュメント
 
-- [CLAUDE.md](../CLAUDE.md): プロジェクト設定と開発ガイド
 - [ARCHITECTURE.md](./ARCHITECTURE.md): システムアーキテクチャ
 - [frontend/README.md](../frontend/README.md): フロントエンド開発ガイド

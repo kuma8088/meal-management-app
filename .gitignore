@@ -87,6 +87,7 @@ data/
 
 # Claude Code configuration (private)
 .claude/
+CLAUDE.md
 
 # Kiro specs (private)
 .kiro/
