@@ -64,9 +64,25 @@ def verify_cognito_token(token: str) -> dict | None:
 
         # ユーザー属性を辞書に変換
         user_attrs = {attr["Name"]: attr["Value"] for attr in response.get("UserAttributes", [])}
+        cognito_sub = user_attrs.get("sub")
+        line_user_id = user_attrs.get("custom:line_user_id")
 
+        # LINE ユーザーの場合、DynamoDB から実際の user_id を取得
+        if line_user_id:
+            db_user = _get_user_by_line_id(line_user_id)
+            if db_user:
+                return {
+                    "user_id": db_user.get("user_id"),  # DynamoDB の user_id を使用
+                    "cognito_sub": cognito_sub,
+                    "line_user_id": line_user_id,
+                    "email": user_attrs.get("email"),
+                    "username": response.get("Username"),
+                    "auth_type": "cognito_line",
+                }
+
+        # 通常の Cognito ユーザーまたは LINE ユーザーが DynamoDB に見つからない場合
         return {
-            "user_id": user_attrs.get("sub"),
+            "user_id": cognito_sub,
             "email": user_attrs.get("email"),
             "username": response.get("Username"),
             "auth_type": "cognito",
@@ -81,6 +97,33 @@ def verify_cognito_token(token: str) -> dict | None:
         return None
     except Exception as e:
         logger.error(f"Token verification error: {str(e)}")
+        return None
+
+
+def _get_user_by_line_id(line_user_id: str) -> dict | None:
+    """
+    LINE user ID で DynamoDB ユーザーを検索
+
+    Args:
+        line_user_id: LINE ユーザー ID
+
+    Returns:
+        ユーザーレコード（存在する場合）または None
+    """
+    try:
+        dynamodb = get_dynamodb()
+        table = dynamodb.Table(USERS_TABLE_NAME)
+        response = table.query(
+            IndexName="LineUserIdIndex",
+            KeyConditionExpression="line_user_id = :lid",
+            ExpressionAttributeValues={":lid": line_user_id},
+        )
+        items = response.get("Items", [])
+        if items:
+            return items[0]
+        return None
+    except ClientError as e:
+        logger.error(f"Failed to get user by LINE ID: {str(e)}")
         return None
 
 
@@ -172,7 +215,7 @@ def unauthorized_response() -> dict:
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Line-User-Id",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
         },
         "body": json.dumps({

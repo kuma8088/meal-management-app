@@ -199,7 +199,9 @@ resource "aws_iam_role_policy" "lambda_cognito_admin" {
           "cognito-idp:AdminSetUserPassword",
           "cognito-idp:AdminUpdateUserAttributes",
           "cognito-idp:ListUsers",
-          "cognito-idp:AdminResetUserPassword"
+          "cognito-idp:AdminResetUserPassword",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:AdminRespondToAuthChallenge"
         ]
         Resource = "arn:aws:cognito-idp:${var.aws_region}:*:userpool/*"
       }

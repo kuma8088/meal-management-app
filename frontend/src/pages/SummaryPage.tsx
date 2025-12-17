@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import { getUserProfile } from '../api/users';
 import { getGoals } from '../api/goals';
 import DailySummary from '../components/DailySummary';
@@ -11,7 +11,7 @@ import type { UserProfile, Goal } from '../types/api';
 import './SummaryPage.css';
 
 const SummaryPage: React.FC = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useUnifiedAuth();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);

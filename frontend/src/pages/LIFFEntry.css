@@ -1,0 +1,110 @@
+/**
+ * LIFF エントリーポイントページのスタイル
+ */
+
+.liff-entry-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #00B900 0%, #00C300 100%);
+  padding: 20px;
+}
+
+.liff-entry-container {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 400px;
+  width: 100%;
+}
+
+.liff-entry-container .app-title {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 32px;
+}
+
+.liff-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.liff-status p {
+  color: #666;
+  font-size: 16px;
+  margin: 0;
+}
+
+/* スピナー */
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #00B900;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 成功表示 */
+.liff-status.success .checkmark {
+  width: 48px;
+  height: 48px;
+  background: #00B900;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.liff-status.success p {
+  color: #00B900;
+}
+
+/* エラー表示 */
+.liff-status.error .error-icon {
+  width: 48px;
+  height: 48px;
+  background: #dc3545;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.liff-status.error .error-message {
+  color: #dc3545;
+}
+
+.retry-button {
+  margin-top: 16px;
+  padding: 12px 32px;
+  background: #00B900;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.retry-button:hover {
+  background: #00A000;
+}

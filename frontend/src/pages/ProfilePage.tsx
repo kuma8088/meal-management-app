@@ -3,14 +3,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import { getUserProfile, createUserProfile, updateUserProfile } from '../api/users';
 import ProfileForm from '../components/ProfileForm';
 import type { UserProfile, CreateUserProfileRequest } from '../types/api';
 import './ProfilePage.css';
 
 const ProfilePage: React.FC = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useUnifiedAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');

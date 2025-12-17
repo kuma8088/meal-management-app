@@ -21,7 +21,7 @@ resource "aws_api_gateway_gateway_response" "cors_response" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
 }
@@ -32,7 +32,7 @@ resource "aws_api_gateway_gateway_response" "cors_response_5xx" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
 }
@@ -227,6 +227,10 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.foods_item.id,
       aws_api_gateway_authorizer.cognito.id,
       aws_api_gateway_authorizer.lambda.id,
+      aws_api_gateway_resource.auth.id,
+      aws_api_gateway_resource.auth_liff_login.id,
+      aws_api_gateway_method.auth_liff_login_post.id,
+      aws_api_gateway_integration.auth_liff_login_post.id,
     ]))
   }
 
@@ -250,6 +254,7 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.users_goals_get,
     aws_api_gateway_integration.foods_search_get,
     aws_api_gateway_integration.foods_item_get,
+    aws_api_gateway_integration.auth_liff_login_post,
   ]
 }
 
@@ -631,7 +636,7 @@ resource "aws_api_gateway_integration_response" "meals_options_200" {
   status_code = aws_api_gateway_method_response.meals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -676,7 +681,7 @@ resource "aws_api_gateway_integration_response" "meals_item_options_200" {
   status_code = aws_api_gateway_method_response.meals_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -721,7 +726,7 @@ resource "aws_api_gateway_integration_response" "users_options_200" {
   status_code = aws_api_gateway_method_response.users_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -766,7 +771,7 @@ resource "aws_api_gateway_integration_response" "users_item_options_200" {
   status_code = aws_api_gateway_method_response.users_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -811,7 +816,7 @@ resource "aws_api_gateway_integration_response" "advice_daily_options_200" {
   status_code = aws_api_gateway_method_response.advice_daily_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -955,7 +960,7 @@ resource "aws_api_gateway_integration_response" "foods_search_options_200" {
   status_code = aws_api_gateway_method_response.foods_search_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1000,7 +1005,7 @@ resource "aws_api_gateway_integration_response" "foods_item_options_200" {
   status_code = aws_api_gateway_method_response.foods_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1139,7 +1144,7 @@ resource "aws_api_gateway_integration_response" "goals_options_200" {
   status_code = aws_api_gateway_method_response.goals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1184,7 +1189,7 @@ resource "aws_api_gateway_integration_response" "goals_item_options_200" {
   status_code = aws_api_gateway_method_response.goals_item_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1229,7 +1234,7 @@ resource "aws_api_gateway_integration_response" "users_goals_options_200" {
   status_code = aws_api_gateway_method_response.users_goals_options_200.status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Line-User-Id'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -1327,6 +1332,122 @@ resource "aws_lambda_permission" "test_users_api_gateway" {
   source_arn    = "arn:aws:execute-api:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${aws_api_gateway_rest_api.main.id}/*"
 }
 
+# ========================================
+# Auth API (LIFF Login)
+# ========================================
+
+# Lambda関数: LIFF Login
+resource "aws_lambda_function" "liff_login" {
+  filename         = "${path.module}/../dist/liff_login.zip"
+  function_name    = "${var.project_name}-${var.environment}-liff-login"
+  role             = aws_iam_role.lambda_execution_role.arn
+  handler          = "liff_login.__init__.lambda_handler"
+  source_code_hash = fileexists("${path.module}/../dist/liff_login.zip") ? filebase64sha256("${path.module}/../dist/liff_login.zip") : ""
+  runtime          = "python3.11"
+  timeout          = 30
+  memory_size      = 256
+
+  environment {
+    variables = {
+      USER_POOL_ID     = aws_cognito_user_pool.main.id
+      CLIENT_ID        = aws_cognito_user_pool_client.web_client.id
+      USERS_TABLE_NAME = aws_dynamodb_table.users.name
+    }
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-liff-login"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# /auth リソース
+resource "aws_api_gateway_resource" "auth" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "auth"
+}
+
+# /auth/liff-login リソース
+resource "aws_api_gateway_resource" "auth_liff_login" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.auth.id
+  path_part   = "liff-login"
+}
+
+# POST /auth/liff-login - LIFF 認証
+resource "aws_api_gateway_method" "auth_liff_login_post" {
+  rest_api_id          = aws_api_gateway_rest_api.main.id
+  resource_id          = aws_api_gateway_resource.auth_liff_login.id
+  http_method          = "POST"
+  authorization        = "NONE" # ログインエンドポイントなので認証不要
+  request_validator_id = aws_api_gateway_request_validator.body_and_params.id
+}
+
+resource "aws_api_gateway_integration" "auth_liff_login_post" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.auth_liff_login.id
+  http_method             = aws_api_gateway_method.auth_liff_login_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.liff_login.invoke_arn
+}
+
+# Lambda permission for auth endpoints
+resource "aws_lambda_permission" "liff_login_api_gateway" {
+  statement_id  = "AllowAPIGatewayInvokeLiffLogin"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.liff_login.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# OPTIONS /auth/liff-login
+resource "aws_api_gateway_method" "auth_liff_login_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.auth_liff_login.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "auth_liff_login_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.auth_liff_login.id
+  http_method = aws_api_gateway_method.auth_liff_login_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "auth_liff_login_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.auth_liff_login.id
+  http_method = aws_api_gateway_method.auth_liff_login_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "auth_liff_login_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.auth_liff_login.id
+  http_method = aws_api_gateway_method.auth_liff_login_options.http_method
+  status_code = aws_api_gateway_method_response.auth_liff_login_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
 # Outputs
 output "api_gateway_url" {
   description = "API Gateway URL"
@@ -1336,4 +1457,9 @@ output "api_gateway_url" {
 output "line_webhook_url" {
   description = "LINE Webhook URL"
   value       = "${aws_api_gateway_stage.main.invoke_url}/line/webhook"
+}
+
+output "liff_login_url" {
+  description = "LIFF Login URL"
+  value       = "${aws_api_gateway_stage.main.invoke_url}/auth/liff-login"
 }

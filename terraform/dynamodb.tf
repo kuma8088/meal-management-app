@@ -209,3 +209,33 @@ resource "aws_dynamodb_table" "advice_usage" {
     Name = "${var.project_name}-advice-usage-${var.environment}"
   }
 }
+
+# Nonce テーブル（LIFF認証リプレイ攻撃対策）
+resource "aws_dynamodb_table" "nonce" {
+  name         = "${var.project_name}-nonce-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "nonce"
+
+  attribute {
+    name = "nonce"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  # Nonce テーブルは短期データのため PITR 不要
+  point_in_time_recovery {
+    enabled = false
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = {
+    Name = "${var.project_name}-nonce-${var.environment}"
+  }
+}

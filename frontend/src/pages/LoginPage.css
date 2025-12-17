@@ -77,6 +77,56 @@
   font-size: 14px;
 }
 
+/* ソーシャルログイン区切り線 */
+.social-login-divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.social-login-divider::before,
+.social-login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.social-login-divider span {
+  padding: 0 16px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* LINE ログインボタン */
+.line-login-button {
+  width: 100%;
+  padding: 14px 20px;
+  background-color: #00B900;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background-color 0.2s;
+}
+
+.line-login-button:hover {
+  background-color: #00A000;
+}
+
+.line-login-button:active {
+  background-color: #009000;
+}
+
+.line-icon {
+  flex-shrink: 0;
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 480px) {
   .login-container {
@@ -89,6 +139,11 @@
 
   .tab {
     padding: 10px 15px;
+    font-size: 14px;
+  }
+
+  .line-login-button {
+    padding: 12px 16px;
     font-size: 14px;
   }
 }

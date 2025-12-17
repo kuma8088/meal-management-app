@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import { getUserProfile } from '../api/users';
 import { createGoal, getGoals } from '../api/goals';
 import GoalForm from '../components/GoalForm';
@@ -11,7 +11,7 @@ import type { UserProfile, Goal, CreateGoalRequest } from '../types/api';
 import './GoalPage.css';
 
 const GoalPage: React.FC = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useUnifiedAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [createdGoal, setCreatedGoal] = useState<Goal | null>(null);

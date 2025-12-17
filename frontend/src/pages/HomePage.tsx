@@ -4,11 +4,11 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import './HomePage.css';
 
 const HomePage: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useUnifiedAuth();
 
   return (
     <div className="home-page">

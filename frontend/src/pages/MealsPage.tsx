@@ -3,14 +3,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import { getMeals } from '../api/meals';
 import MealsList from '../components/MealsList';
 import type { Meal } from '../types/api';
 import './MealsPage.css';
 
 const MealsPage: React.FC = () => {
-  const { user: _user } = useAuth();
+  const { user: _user } = useUnifiedAuth();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');

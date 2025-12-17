@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useUnifiedAuth } from '../contexts/UnifiedAuthContext';
 import { createMeal } from '../api/meals';
 import { searchFoodsByName } from '../api/foods';
 import MealRegistrationForm from '../components/MealRegistrationForm';
@@ -12,7 +12,7 @@ import type { MealType, MealFood, Food } from '../types/api';
 import './MealRegistrationPage.css';
 
 const MealRegistrationPage: React.FC = () => {
-  const { user: _user } = useAuth();
+  const { user: _user } = useUnifiedAuth();
   const navigate = useNavigate();
   const [successMessage, setSuccessMessage] = useState<string>('');
 

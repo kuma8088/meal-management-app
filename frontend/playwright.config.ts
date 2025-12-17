@@ -26,10 +26,10 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts/,
     },
 
-    // 認証なしテスト（ログイン・ユーザー登録など）
+    // 認証なしテスト（ログイン・ユーザー登録・LINE ログインなど）
     {
       name: 'chromium-unauthenticated',
-      testMatch: /.*\/auth\.spec\.ts/,
+      testMatch: /.*\/auth(\/.*)?\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
       },
@@ -39,7 +39,7 @@ export default defineConfig({
     // 認証が必要なテスト
     {
       name: 'chromium',
-      testIgnore: /.*\/auth\.spec\.ts/, // auth.spec.tsは除外
+      testIgnore: /.*\/auth(\/.*)?\.spec\.ts/, // auth関連テストは除外
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',

@@ -35,6 +35,20 @@ variable "line_channel_access_token" {
   default     = ""
 }
 
+# LINE Login (OIDC) 設定
+variable "line_login_channel_id" {
+  description = "LINE Login Channel ID for Cognito OIDC integration"
+  type        = string
+  default     = ""
+}
+
+variable "line_login_channel_secret" {
+  description = "LINE Login Channel Secret for Cognito OIDC integration"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "alert_email" {
   description = "Email address for CloudWatch Alarms notifications"
   type        = string

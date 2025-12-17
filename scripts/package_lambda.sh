@@ -28,6 +28,12 @@ LAMBDA_FUNCTIONS=(
     "food_master_import"
     "weekly_report"
     "test_user_management"
+    "authorizer"
+    "define_auth_challenge"
+    "create_auth_challenge"
+    "verify_auth_challenge"
+    "post_confirmation"
+    "liff_login"
 )
 
 # 各Lambda関数をパッケージ化

@@ -3,13 +3,15 @@
  *
  * 認証方式:
  * - 通常ブラウザ: Cognito 認証
- * - LIFF 経由: LINE 認証 (LINE User ID で API 呼び出し)
+ * - LINE Hosted UI: Cognito 経由の LINE ログイン
+ * - LIFF 経由: LINE ID Token → /auth/liff-login → Cognito JWT
+ *
+ * すべての API 呼び出しは Cognito JWT で認証
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { LiffProvider, useLiff } from './contexts/LiffContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UnifiedAuthProvider, useUnifiedAuth } from './contexts/UnifiedAuthContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
@@ -18,6 +20,8 @@ import FoodSearchPage from './pages/FoodSearchPage';
 import MealsPage from './pages/MealsPage';
 import MealRegistrationPage from './pages/MealRegistrationPage';
 import SummaryPage from './pages/SummaryPage';
+import LIFFEntry from './pages/LIFFEntry';
+import CallbackPage from './pages/CallbackPage';
 
 /**
  * プライベートルート（認証必須）
@@ -27,23 +31,42 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isLiffInitialized, isInLiff } = useUnifiedAuth();
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // LIFF 初期化中または認証チェック中は読み込み表示
+  if (loading || !isLiffInitialized) {
+    return <div className="loading-screen">Loading...</div>;
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  // LIFF 認証処理中の場合は読み込み表示（無限ループ防止）
+  const liffAuthInProgress = sessionStorage.getItem('liffAuthInProgress') === 'true';
+  if (liffAuthInProgress) {
+    console.log('PrivateRoute: LIFF auth in progress, showing loading screen');
+    return <div className="loading-screen">認証処理中...</div>;
+  }
+
+  if (!user) {
+    // LIFF 環境の場合は /liff にリダイレクト（/login → /liff の二重リダイレクトを防ぐ）
+    return <Navigate to={isInLiff ? '/liff' : '/login'} replace />;
+  }
+
+  return <>{children}</>;
 };
 
 /**
  * パブリックルート（未認証のみ）
  */
 const PublicRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isLiffInitialized, isInLiff } = useUnifiedAuth();
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // LIFF 初期化中または認証チェック中は読み込み表示
+  if (loading || !isLiffInitialized) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  // LIFF 環境の場合は /liff にリダイレクト
+  if (isInLiff && !user) {
+    return <Navigate to="/liff" replace />;
   }
 
   return !user ? <>{children}</> : <Navigate to="/" replace />;
@@ -64,6 +87,12 @@ const AppRoutes: React.FC = () => {
           </PublicRoute>
         }
       />
+
+      {/* LIFF エントリーポイント */}
+      <Route path="/liff" element={<LIFFEntry />} />
+
+      {/* OAuth コールバック */}
+      <Route path="/callback" element={<CallbackPage />} />
 
       {/* プライベートルート */}
       <Route
@@ -136,54 +165,17 @@ const AppRoutes: React.FC = () => {
 };
 
 /**
- * LIFF 自動ログインコンポーネント
- *
- * LIFF 経由でアクセスした場合、LINE プロフィールを取得して自動ログイン
- */
-const LiffAutoLogin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isLiffInitialized, isInLiff, isLoggedIn, profile } = useLiff();
-  const { user, signInWithLine } = useAuth();
-  const [isSigningIn, setIsSigningIn] = React.useState(false);
-
-  useEffect(() => {
-    // LIFF 初期化完了 + LIFF 環境 + LINE ログイン済み + プロフィール取得済み + 未ログイン + 未ログイン中
-    if (isLiffInitialized && isInLiff && isLoggedIn && profile && !user && !isSigningIn) {
-      const performSignIn = async () => {
-        setIsSigningIn(true);
-        try {
-          await signInWithLine(profile.userId, profile.displayName);
-        } catch (error) {
-          console.error('LIFF auto-login failed:', error);
-        } finally {
-          setIsSigningIn(false);
-        }
-      };
-      performSignIn();
-    }
-  }, [isLiffInitialized, isInLiff, isLoggedIn, profile, user, signInWithLine, isSigningIn]);
-
-  // LIFF 初期化中またはログイン中は読み込み表示
-  if (!isLiffInitialized || isSigningIn) {
-    return <div>Loading...</div>;
-  }
-
-  return <>{children}</>;
-};
-
-/**
  * アプリケーション
+ *
+ * UnifiedAuthProvider で Cognito + LIFF 認証を統合管理
  */
 const App: React.FC = () => {
   return (
-    <LiffProvider>
-      <AuthProvider>
-        <Router>
-          <LiffAutoLogin>
-            <AppRoutes />
-          </LiffAutoLogin>
-        </Router>
-      </AuthProvider>
-    </LiffProvider>
+    <UnifiedAuthProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </UnifiedAuthProvider>
   );
 };
 

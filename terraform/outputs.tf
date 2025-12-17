@@ -6,6 +6,7 @@ output "dynamodb_tables" {
     foods        = aws_dynamodb_table.foods.name
     goals        = aws_dynamodb_table.goals.name
     advice_usage = aws_dynamodb_table.advice_usage.name
+    nonce        = aws_dynamodb_table.nonce.name
   }
 }
 
