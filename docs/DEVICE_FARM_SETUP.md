@@ -55,7 +55,7 @@ env:             # APIベースURL、Cognito 設定、テストユーザー認�
 
 **実行フロー**:
 1. **Build & Upload**: Node.js ビルド → Device Farm へアップロード
-2. **Run Tests**: Android/iOS デバイスプール上でテスト実行
+2. **Run Tests**: Android デバイスプール上でテスト実行
 3. **Collect Results**: テストアーティファクト収集
 4. **Report**: GitHub PR へコメント、Slack 通知
 
@@ -167,7 +167,6 @@ provider "aws" {
 
 # # Device Farm Device Pools
 # resource "aws_devicefarm_device_pool" "android" { ... }
-# resource "aws_devicefarm_device_pool" "ios" { ... }
 ```
 
 #### ステップ 3: Terraform 適用
@@ -310,7 +309,7 @@ await page.fill('#field2', 'value2');
 
 ### Q: 複数のデバイスで同時実行できる？
 
-**A**: はい。`device-farm.yml` の `strategy.matrix` で `device-pool: [android, ios]` と指定すると、Android と iOS デバイスプール上で並列実行できます。
+**A**: はい。`device-farm.yml` の `strategy.matrix` で複数のデバイスを指定すると、Device Farm 上で並列実行できます。現在は Android デバイスプールのみを使用しています（Web アプリのため iOS テストは不要）。
 
 ## 関連ドキュメント
 

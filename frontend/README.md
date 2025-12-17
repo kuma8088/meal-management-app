@@ -8,7 +8,7 @@ React + TypeScript + Vite で構築された食事管理アプリケーション
 - **言語**: TypeScript
 - **ビルドツール**: Vite
 - **ルーティング**: React Router v7
-- **認証**: Amazon Cognito
+- **認証**: Amazon Cognito + LINE LIFF
 - **HTTPクライアント**: Axios
 - **E2Eテスト**: Playwright
 
@@ -32,6 +32,7 @@ cp .env.example .env
 - `VITE_API_BASE_URL`: API Gateway URL
 - `VITE_COGNITO_USER_POOL_ID`: Cognito User Pool ID
 - `VITE_COGNITO_CLIENT_ID`: Cognito Client ID
+- `VITE_LIFF_ID`: LINE LIFF アプリケーション ID（LIFF 認証使用時）
 
 ## 開発
 
@@ -79,6 +80,9 @@ frontend/
 │   ├── api/          # APIクライアント
 │   ├── components/   # 再利用可能なコンポーネント
 │   ├── contexts/     # Reactコンテキスト
+│   │   ├── AuthContext.tsx        # Cognito認証コンテキスト
+│   │   ├── LiffContext.tsx        # LINE LIFF認証コンテキスト
+│   │   └── UnifiedAuthContext.tsx # 統合認証コンテキスト
 │   ├── hooks/        # カスタムフック
 │   ├── pages/        # ページコンポーネント
 │   ├── types/        # TypeScript型定義
@@ -88,6 +92,26 @@ frontend/
 ├── playwright.config.ts  # Playwright設定
 └── vite.config.ts        # Vite設定
 ```
+
+## 認証アーキテクチャ
+
+本アプリケーションは **LINE ユーザー** と **ブラウザユーザー** の両方に対応しています。
+
+### 認証フロー
+
+| 環境 | 認証方式 | コンテキスト |
+|------|----------|--------------|
+| LINE アプリ内 (LIFF) | LINE ID Token → Cognito Custom Auth | `LiffContext` |
+| ブラウザ | Email/Password → Cognito Standard Auth | `AuthContext` |
+
+### 統合認証
+
+`UnifiedAuthContext` が実行環境を自動検出し、適切な認証フローを選択します：
+
+1. **LIFF 環境検出**: `liff.isInClient()` で LINE アプリ内かを判定
+2. **認証開始**: 環境に応じて LIFF 認証または Cognito 認証を開始
+3. **トークン取得**: どちらの経路でも最終的に Cognito JWT Token を取得
+4. **API アクセス**: 統一された JWT Token で API Gateway にアクセス
 
 ---
 

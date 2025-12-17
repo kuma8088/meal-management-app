@@ -249,6 +249,37 @@ LINE Messaging API からの Webhook を受信
 
 ---
 
+### 認証（LINE ID 連携）
+
+#### POST /auth/liff-login
+
+LIFF から Cognito Custom Auth を開始
+
+**リクエスト**:
+```json
+{
+  "line_id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**レスポンス (200)**:
+```json
+{
+  "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expires_in": 3600
+}
+```
+
+**処理フロー**:
+1. LINE ID Token を受信
+2. Cognito `InitiateAuth` (CUSTOM_AUTH) を呼び出し
+3. Lambda Triggers で LINE ID Token を検証
+4. 検証成功後、Cognito JWT Token を返却
+
+---
+
 ### テストユーザー管理（開発環境のみ）
 
 #### GET /test-users
