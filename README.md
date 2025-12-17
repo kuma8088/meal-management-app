@@ -77,6 +77,7 @@ LINE から手軽に食事を記録し、カロリーと栄養バランスを自
 │   ├── dynamodb.tf        # DynamoDBテーブル定義
 │   ├── s3.tf              # S3バケット定義
 │   ├── cognito.tf         # Cognito User Pool定義
+│   ├── cognito_triggers.tf # Cognito Lambda Triggers
 │   ├── cloudfront.tf      # CloudFront CDN定義
 │   ├── iam.tf             # IAMロールとポリシー定義
 │   ├── api_gateway.tf     # API Gateway定義
@@ -90,6 +91,11 @@ LINE から手軽に食事を記録し、カロリーと栄養バランスを自
 │       │   └── auth.py    # 認証ヘルパー（Cognito/LINE両対応）
 │       ├── authorizer/    # API Gateway Lambda Authorizer
 │       ├── line_handler/  # LINE Webhook Handler
+│       ├── liff_login/    # LIFF → Cognito Custom Auth
+│       ├── define_auth_challenge/   # Cognito: チャレンジ定義
+│       ├── create_auth_challenge/   # Cognito: チャレンジ生成
+│       ├── verify_auth_challenge/   # Cognito: LINE ID Token検証
+│       ├── post_confirmation/       # Cognito: ユーザー作成後処理
 │       ├── meal_registration/  # 食事登録・ユーザー管理
 │       ├── food_search/   # 食品検索
 │       ├── daily_summary/ # 1日の総評とAIアドバイス
@@ -103,8 +109,9 @@ LINE から手軽に食事を記録し、カロリーと栄養バランスを自
 │   │   ├── assets/       # 静的アセット
 │   │   ├── components/   # UIコンポーネント
 │   │   ├── contexts/     # Reactコンテキスト
-│   │   │   ├── AuthContext.tsx   # Cognito認証
-│   │   │   └── LiffContext.tsx   # LINE LIFF認証
+│   │   │   ├── AuthContext.tsx        # Cognito認証
+│   │   │   ├── LiffContext.tsx        # LINE LIFF認証
+│   │   │   └── UnifiedAuthContext.tsx # 統合認証コンテキスト
 │   │   ├── hooks/        # カスタムフック
 │   │   ├── pages/        # ページコンポーネント
 │   │   ├── types/        # TypeScript型定義
@@ -293,33 +300,50 @@ LINE App → API Gateway → line_handler → daily_summary (総評機能)
 
 ## 認証アーキテクチャ
 
-本アプリケーションは2つの認証方式をサポートしています：
+本アプリケーションは **Cognito User Pool** を認証基盤として、LINE ユーザーとブラウザユーザーを統合管理しています。
 
-### 1. Cognito 認証（ブラウザアクセス）
-
-```
-ブラウザ → CloudFront → React App → Cognito → API Gateway → Lambda
-```
-
-- 標準的なメール/パスワード認証
-- JWT トークンを `Authorization: Bearer <token>` ヘッダーで送信
-
-### 2. LIFF 認証（LINE アプリ内ブラウザ）
+### 統合認証基盤
 
 ```
-LINE App → LIFF → React App → LINE ID Token → API Gateway → Lambda Authorizer → Lambda
+┌─────────────────────────────────────────────────────────────┐
+│                    Cognito User Pool                         │
+│              (統一された user_id で管理)                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  【LINE ユーザー】              【ブラウザユーザー】            │
+│   LIFF SDK                      Cognito Hosted UI            │
+│       ↓                              ↓                        │
+│   LINE ID Token                 Email/Password               │
+│       ↓                              ↓                        │
+│   Custom Auth Flow              Standard Auth                 │
+│   (Lambda Triggers)                                           │
+│       ↓                              ↓                        │
+│   ─────────── Cognito JWT Token ───────────                  │
+│                      ↓                                        │
+│              API Gateway                                      │
+│         (Lambda Authorizer)                                   │
+│                      ↓                                        │
+│              Lambda Functions                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-- LINE Login による認証
-- LIFF SDK で取得した ID トークンを使用
-- Lambda Authorizer が LINE ID トークンを検証し、user_id を抽出
+### LINE ID 連携の仕組み
+
+LINE ユーザーは **Cognito Custom Auth Flow** を通じて認証されます：
+
+1. LIFF SDK で LINE ID Token を取得
+2. `/auth/liff-login` API で Custom Auth を開始
+3. Lambda Triggers が LINE ID Token を検証
+4. 検証成功後、Cognito JWT Token を発行
+
+これにより、LINE ユーザーもブラウザユーザーも同じ Cognito JWT Token で API にアクセスします。
 
 ### 認証の自動切り替え
 
-フロントエンドは実行環境を自動検出し、適切な認証方式を選択します：
+フロントエンドは実行環境を自動検出し、適切な認証フローを選択します：
 
-- LIFF 環境内: LINE ID トークンを使用
-- ブラウザ: Cognito JWT トークンを使用
+- **LIFF 環境**: LINE ID Token → Cognito Custom Auth → JWT
+- **ブラウザ**: Email/Password → Cognito Standard Auth → JWT
 
 ## ドキュメント
 

@@ -10,6 +10,7 @@ meal-management-app/
 │   ├── dynamodb.tf               # DynamoDBテーブル定義
 │   ├── s3.tf                     # S3バケット定義
 │   ├── cognito.tf                # Cognito User Pool定義
+│   ├── cognito_triggers.tf       # Cognito Lambda Triggers定義
 │   ├── cloudfront.tf             # CloudFront CDN定義
 │   ├── iam.tf                    # IAMロールとポリシー定義
 │   ├── api_gateway.tf            # API Gateway定義
@@ -28,6 +29,11 @@ meal-management-app/
 │       │   └── error_handling.py
 │       ├── authorizer/           # API Gateway Lambda Authorizer
 │       ├── line_handler/         # LINE Webhook Handler
+│       ├── liff_login/           # LIFF → Cognito Custom Auth 開始
+│       ├── define_auth_challenge/  # Cognito Custom Auth: チャレンジ定義
+│       ├── create_auth_challenge/  # Cognito Custom Auth: チャレンジ生成
+│       ├── verify_auth_challenge/  # Cognito Custom Auth: LINE ID Token 検証
+│       ├── post_confirmation/    # Cognito: ユーザー作成後処理
 │       ├── meal_registration/    # 食事登録・ユーザー管理
 │       ├── food_search/          # 食品検索
 │       ├── goal_management/      # 目標管理
@@ -47,7 +53,7 @@ meal-management-app/
 │   ├── ARCHITECTURE.md          # アーキテクチャ概要
 │   ├── API_SPECIFICATION.md     # API仕様書
 │   ├── DEPLOYMENT.md            # デプロイ手順
-│   └── USER_TEST_GUIDE.md       # ユーザーテストガイド
+│   └── DEVICE_FARM_SETUP.md     # Device Farm設定ガイド
 ├── .github/
 │   └── workflows/               # GitHub Actions
 │       └── device-farm.yml      # Device Farm E2Eテスト
@@ -133,6 +139,109 @@ meal-management-app/
 
 ## 認証・認可
 
+### 認証アーキテクチャ概要
+
+本アプリケーションは **LINE ユーザー** と **ブラウザユーザー** の両方に対応した統合認証基盤を提供します。
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        認証フロー                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  【LINE アプリ】                    【ブラウザ】                        │
+│       │                                 │                             │
+│       ▼                                 ▼                             │
+│  ┌─────────┐                      ┌──────────┐                       │
+│  │  LIFF   │                      │  Cognito │                       │
+│  │  SDK    │                      │ Hosted UI│                       │
+│  └────┬────┘                      └────┬─────┘                       │
+│       │ LINE ID Token                  │ Email/Password              │
+│       ▼                                 ▼                             │
+│  ┌─────────────────────────────────────────────────────┐             │
+│  │              Cognito User Pool                       │             │
+│  │         (Custom Auth Flow / Standard Auth)           │             │
+│  └───────────────────────┬─────────────────────────────┘             │
+│                          │                                            │
+│                          ▼ Cognito JWT                                │
+│  ┌─────────────────────────────────────────────────────┐             │
+│  │              API Gateway + Lambda Authorizer         │             │
+│  └───────────────────────┬─────────────────────────────┘             │
+│                          │                                            │
+│                          ▼                                            │
+│  ┌─────────────────────────────────────────────────────┐             │
+│  │                    Lambda Functions                  │             │
+│  └─────────────────────────────────────────────────────┘             │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### LINE ID 連携（Cognito Custom Auth Flow）
+
+LINE ユーザーが Cognito の認証基盤を利用できるよう、Custom Authentication Flow を実装しています。
+
+#### 認証シーケンス
+
+```
+LINE App          LIFF          API Gateway      Cognito         Lambda Triggers
+   │                │                │               │                │
+   │  1. LIFF起動   │                │               │                │
+   │───────────────>│                │               │                │
+   │                │                │               │                │
+   │  2. LINE Login │                │               │                │
+   │<───────────────│                │               │                │
+   │                │                │               │                │
+   │  3. ID Token   │                │               │                │
+   │───────────────>│                │               │                │
+   │                │                │               │                │
+   │                │ 4. POST /auth/liff-login       │                │
+   │                │───────────────>│               │                │
+   │                │                │               │                │
+   │                │                │ 5. InitiateAuth (CUSTOM_AUTH)  │
+   │                │                │──────────────>│                │
+   │                │                │               │                │
+   │                │                │               │ 6. DefineAuthChallenge
+   │                │                │               │───────────────>│
+   │                │                │               │<───────────────│
+   │                │                │               │                │
+   │                │                │               │ 7. CreateAuthChallenge
+   │                │                │               │───────────────>│
+   │                │                │               │<───────────────│
+   │                │                │               │                │
+   │                │                │ 8. RespondToAuthChallenge      │
+   │                │                │──────────────>│                │
+   │                │                │               │                │
+   │                │                │               │ 9. VerifyAuthChallenge
+   │                │                │               │───────────────>│
+   │                │                │               │  (LINE ID Token検証)
+   │                │                │               │<───────────────│
+   │                │                │               │                │
+   │                │                │ 10. Cognito JWT Token          │
+   │                │                │<──────────────│                │
+   │                │                │               │                │
+   │                │ 11. JWT Token  │               │                │
+   │                │<───────────────│               │                │
+   │                │                │               │                │
+```
+
+#### Lambda Triggers
+
+| Lambda 関数 | 役割 |
+|-------------|------|
+| `liff_login` | LIFF から呼び出され、Cognito Custom Auth を開始 |
+| `define_auth_challenge` | 認証チャレンジの種類を定義 |
+| `create_auth_challenge` | チャレンジを生成（LINE ID Token を期待） |
+| `verify_auth_challenge` | LINE ID Token を検証し、ユーザーを認証 |
+| `post_confirmation` | ユーザー作成後に Users テーブルへ登録 |
+
+#### LINE ID Token 検証
+
+`verify_auth_challenge` Lambda で以下を検証:
+
+1. **署名検証**: LINE の公開鍵（JWKS）で JWT 署名を検証
+2. **有効期限**: `exp` クレームをチェック
+3. **発行者**: `iss` が `https://access.line.me` であることを確認
+4. **Audience**: `aud` が LIFF Channel ID と一致することを確認
+
 ### Cognito User Pool
 
 - **ユーザー名属性**: email
@@ -143,11 +252,14 @@ meal-management-app/
 - **MFA**: オプション（ソフトウェアトークン）
 - **アカウント復旧**: メール経由
 - **削除保護**: 本番環境で有効
+- **カスタム属性**:
+  - `custom:line_user_id`: LINE ユーザー ID
 
 ### Cognito User Pool Client
 
 - **認証フロー**:
-  - USER_PASSWORD_AUTH
+  - USER_PASSWORD_AUTH（ブラウザユーザー）
+  - CUSTOM_AUTH（LINE ユーザー）
   - REFRESH_TOKEN_AUTH
   - USER_SRP_AUTH
 - **トークン有効期限**:
@@ -157,6 +269,15 @@ meal-management-app/
 - **OAuth 設定**:
   - フロー: code, implicit
   - スコープ: email, openid, profile
+
+### ユーザー識別
+
+| 認証経路 | ユーザー識別子 | Cognito 属性 |
+|----------|---------------|--------------|
+| LINE アプリ | LINE User ID | `custom:line_user_id` |
+| ブラウザ | Email | `email` |
+
+両方の経路から同じ Cognito User Pool を使用することで、統一された `user_id`（Cognito `sub`）で管理されます。
 
 ### IAM ロール
 
@@ -237,7 +358,7 @@ Resource = "arn:aws:lambda:${region}:*:function:${project}-${env}-*"
 - **用途**: 実機でのレスポンシブ動作確認
 - **注意**: Web アプリのため iOS テストは不要（削除済み）
 
-詳細は [99_DeviceFarm_Usecase.md](99_DeviceFarm_Usecase.md) を参照。
+詳細は [DEVICE_FARM_SETUP.md](DEVICE_FARM_SETUP.md) を参照。
 
 ## 環境分離
 
