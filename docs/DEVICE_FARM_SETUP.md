@@ -6,9 +6,9 @@
 
 ## 実装状況
 
-### ✅ 完了したタスク
+### ✅ 実装済み機能
 
-#### Task 2.1-2.3: インフラ整備
+#### インフラ整備
 - **CloudFront Distribution**: フロントエンド配信用の CDN 設定
   - `frontend/s3_oai.cloudfront_access_identity` でセキュアな S3 アクセス
   - キャッシュポリシー (CachingOptimized, CachingDisabled) で最適化
@@ -18,7 +18,7 @@
   - `test_artifacts`: テストレポート・スクリーンショット・トレース保存
   - バージョニング・暗号化・ライフサイクル管理対応
 
-#### Task 2.4-2.6: テストユーザー管理とIAM
+#### テストユーザー管理と IAM
 - **Lambda 関数**: `test_user_management`
   - Cognito ユーザー管理 API
   - 操作: create, delete, get, list, reset_password
@@ -36,7 +36,7 @@
   GET /test-users?operation=list&filter_prefix=testuser-
   ```
 
-#### Task 2.8: Test Specification (testspec.yml)
+#### Test Specification (testspec.yml)
 ```yaml
 phases:
   pre_test:      # Node.js 依存関係、Playwright ブラウザインストール
@@ -47,7 +47,7 @@ artifacts:       # HTML レポート、JSON 結果、スクリーンショット
 env:             # APIベースURL、Cognito 設定、テストユーザー認証情報
 ```
 
-#### Task 2.9: GitHub Actions ワークフロー (.github/workflows/device-farm.yml)
+#### GitHub Actions ワークフロー (.github/workflows/device-farm.yml)
 **トリガー条件**:
 - PR がオープン・同期・再オープンされた時
 - 毎週日曜日 9:00 UTC (日本時間 18:00)
