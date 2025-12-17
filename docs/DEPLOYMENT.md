@@ -11,7 +11,7 @@
 
 | 環境 | 用途 | API URL |
 |------|------|---------|
-| dev | 開発 | `https://868t2tljy9.execute-api.ap-northeast-1.amazonaws.com/dev` |
+| dev | 開発 | `terraform output api_gateway_url` で取得 |
 | staging | ステージング | (未作成) |
 | prod | 本番 | (未作成) |
 
@@ -71,10 +71,11 @@ line_channel_access_token = "your-token"
 
 ### Frontend (frontend/.env)
 
-```
-VITE_API_BASE_URL=https://868t2tljy9.execute-api.ap-northeast-1.amazonaws.com/dev
-VITE_COGNITO_USER_POOL_ID=ap-northeast-1_fmIO9wUwC
-VITE_COGNITO_CLIENT_ID=7fjjol84obkgbj4mh29qtjp6i8
+```bash
+# terraform output で取得した値を設定
+VITE_API_BASE_URL=https://{api-id}.execute-api.{region}.amazonaws.com/{stage}
+VITE_COGNITO_USER_POOL_ID={user-pool-id}
+VITE_COGNITO_CLIENT_ID={client-id}
 ```
 
 ## テスト実行
@@ -129,8 +130,11 @@ aws logs tail /aws/lambda/meal-management-app-food-search-dev --follow
 ### Cognito 認証エラー
 
 ```bash
+# User Pool ID を取得
+terraform -chdir=terraform output cognito_user_pool_id
+
 # ユーザー確認
-aws cognito-idp list-users --user-pool-id ap-northeast-1_fmIO9wUwC
+aws cognito-idp list-users --user-pool-id $(terraform -chdir=terraform output -raw cognito_user_pool_id)
 ```
 
 ### Lambda 間呼び出しエラー (AccessDeniedException)

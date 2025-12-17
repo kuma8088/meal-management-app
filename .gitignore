@@ -85,7 +85,30 @@ data/
 *.csv.gz
 *.xlsx
 
+# Claude Code configuration (private)
+.claude/
+
+# Kiro specs (private)
+.kiro/
+.claude/skills/
+.claude/rules/
+.claude/project/
+.claude/settings.local.json
+
+# Private documentation
+docs/private/
+
+# Draft and internal docs
 content-seeds.md
 portfolio-draft.md
-docs/ROADMAP_STATUS.md
-.claude/
+
+# Terraform sensitive files
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+
+# AWS credentials
+credentials.json
+.aws/
+
+# Playwright auth state
+frontend/e2e/auth/

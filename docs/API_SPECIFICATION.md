@@ -4,7 +4,8 @@
 
 食事管理アプリケーション REST API の仕様書です。
 
-- **Base URL**: `https://868t2tljy9.execute-api.ap-northeast-1.amazonaws.com/dev`
+- **Base URL**: `https://{api-id}.execute-api.{region}.amazonaws.com/{stage}`
+  - `terraform output api_gateway_url` で取得可能
 - **認証**: Amazon Cognito JWT トークン（Authorization ヘッダー）
 
 ## 認証

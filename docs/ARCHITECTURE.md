@@ -4,12 +4,6 @@
 
 ```
 meal-management-app/
-├── .kiro/
-│   └── specs/
-│       └── meal-management-app/
-│           ├── requirements.md    # 要件定義書
-│           ├── design.md          # 設計書
-│           └── tasks.md           # 実装計画
 ├── terraform/                     # インフラストラクチャコード
 │   ├── provider.tf               # AWSプロバイダー設定
 │   ├── variables.tf              # 変数定義
@@ -60,8 +54,6 @@ meal-management-app/
 ├── .gitignore
 ├── README.md
 ├── Makefile
-├── requirements.txt             # Python依存関係
-├── requirements-dev.txt         # 開発用依存関係
 └── pytest.ini                   # pytest設定
 ```
 
