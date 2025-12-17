@@ -71,6 +71,46 @@ env:             # APIベースURL、Cognito 設定、テストユーザー認�
 - クロスブラウザテスト対応 (Chrome, Firefox, Safari)
 - ローカル開発でも同じテストを実行可能
 
+### 【参考】iOS テスト除外の経緯
+
+2025-12-11 に iOS device pool を Device Farm 設定から除外しました。
+
+**背景**: AWS から以下の警告メールを受信
+
+> We are reaching out about several recent errors your AWS account has experienced using the AWS Device Farm service. It seems that there may be an unsupported configuration being used as part of your test spec file for iOS.
+
+**問題の原因**: Web アプリに対して iOS 実機テストを実行していた
+
+| 設定項目 | 問題のあった設定 | 修正後 |
+|---------|------------------|--------|
+| device-pool | `[android, ios]` | Android のみ |
+| testspec.yml | `ios_test_host: macos_sequoia` | 使用せず |
+
+**iOS テストが不適切だった理由**:
+
+1. **本プロジェクトは React Web アプリ**
+   - Playwright + Chromium でのブラウザテストが目的
+   - iOS Safari でのテストは Playwright の Webkit プロジェクトで代替可能
+
+2. **Device Farm の iOS テストは過剰**
+   - iOS 実機が必要なのはネイティブ機能（カメラ、GPS 等）のテスト
+   - Web アプリのブラウザテストには不要
+   - コストと実行時間が増加するだけ
+
+3. **LIFF 環境のテストは Device Farm では不可能**
+   - LINE アプリ内ブラウザは Device Farm でエミュレートできない
+   - LIFF テストは手動または LIFF SDK モックで対応
+
+**Device Farm が最適なケース（参考）**:
+
+| ユースケース | 理由 |
+|-------------|------|
+| ネイティブアプリ (iOS/Android) | 実機でしかテストできない機能（カメラ、GPS、センサー） |
+| ハイブリッドアプリ (React Native, Flutter) | ネイティブブリッジの動作確認 |
+| 複数デバイス互換性テスト | iPhone 12/13/14、Galaxy S21/S22 等の差異検証 |
+
+**結論**: 純粋な Web アプリには Device Farm の iOS テストは不要。Playwright の Webkit プロジェクトで十分なカバレッジが得られます。
+
 ## 実装詳細
 
 ### 20 個のクリティカルパス Playwright E2E テスト
