@@ -1,0 +1,203 @@
+<mxfile host="65bd71144e" scale="1" border="15">
+    <diagram name="Meal Management System Architecture" id="0">
+        <mxGraphModel dx="1239" dy="1162" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#ffffff" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="LINE で食事カロリーを管理するヘルスチェックアプリ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="19" width="500" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws-cloud" value="AWS Cloud" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="69" width="1000" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="line-app" value="LINE App" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#00C300;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.mobile_client;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="-110" y="80" width="50" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="browser" value="Browser" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.client;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="-110" y="190" width="50" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="-60" y="119" as="sourcePoint"/>
+                        <mxPoint x="100" y="169" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="20" y="119"/>
+                            <mxPoint x="20" y="169"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="-60" y="215" as="sourcePoint"/>
+                        <mxPoint x="100" y="169" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="20" y="215"/>
+                            <mxPoint x="20" y="169"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#7AA116;" parent="aws-cloud" edge="1" source="browser">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="139" y="260" as="sourcePoint"/>
+                        <mxPoint x="139" y="302" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="-85" y="281"/>
+                            <mxPoint x="140" y="281"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="api-gateway" value="API Gateway&#xa;HTTP API" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="100" y="170.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="authorizer" value="Lambda&#xa;Authorizer" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="100" y="45.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="cognito" value="Cognito&#xa;User Pool" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="240" y="45.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="lambda-group" value="Lambda Functions" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#ED7100;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#ED7100;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="240" y="170.5" width="520" height="274" as="geometry"/>
+                </mxCell>
+                <mxCell id="line-handler" value="Lambda&#xa;LINE Handler" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="280" y="204.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="meal-reg" value="Lambda&#xa;食事登録" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="400" y="204.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="food-search" value="Lambda&#xa;食品検索" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="520" y="204.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="daily-summary" value="Lambda&#xa;日次総評" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="640" y="204.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="goal-mgmt" value="Lambda&#xa;目標管理" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="400" y="324.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="weekly-report" value="Lambda&#xa;週次レポート" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="520" y="324.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="liff-login" value="Lambda&#xa;LIFF Login" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="280" y="324.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamodb-group" value="DynamoDB Tables" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#C925D1;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#C925D1;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="240" y="499.5" width="520" height="175" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamo-users" value="DynamoDB&#xa;Users" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="280" y="540.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamo-meals" value="DynamoDB&#xa;Meals" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="400" y="540.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamo-foods" value="DynamoDB&#xa;Foods (2,538品)" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="520" y="540.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamo-goals" value="DynamoDB&#xa;Goals" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="640" y="540.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="bedrock" value="Bedrock&#xa;Claude 3" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="860" y="204.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="s3-frontend" value="S3&#xa;React SPA" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="100" y="342.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="eventbridge" value="EventBridge&#xa;定期実行" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="790" y="561.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="cloudwatch" value="CloudWatch&#xa;Logs" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="340" y="45.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;dashed=1;strokeColor=#DD344C;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;" parent="aws-cloud" edge="1" source="api-gateway">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="139" y="144.5" as="sourcePoint"/>
+                        <mxPoint x="139" y="112.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;dashed=1;strokeColor=#DD344C;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="178" y="84.5" as="sourcePoint"/>
+                        <mxPoint x="240" y="84.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="178" y="209.5" as="sourcePoint"/>
+                        <mxPoint x="240" y="209.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#C925D1;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="408.5" y="455.5" as="sourcePoint"/>
+                        <mxPoint x="408.5" y="495.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#C925D1;" parent="aws-cloud" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="518.5" y="455.5" as="sourcePoint"/>
+                        <mxPoint x="518.5" y="495.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e8" value="DynamoDBキャッシュミス" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#01A88D;dashed=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;" parent="aws-cloud" edge="1" target="bedrock" source="food-search">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="760" y="213.5" as="sourcePoint"/>
+                        <mxPoint x="800" y="213.5" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="559" y="145.5"/>
+                            <mxPoint x="899" y="145.5"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e9" value="Cron" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" parent="aws-cloud" edge="1" target="weekly-report" source="eventbridge">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="800" y="73.5" as="sourcePoint"/>
+                        <mxPoint x="760" y="213.5" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="829" y="475.5"/>
+                            <mxPoint x="559" y="475.5"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend" value="凡例" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=left;spacingLeft=10;fontSize=12;fontStyle=1;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="30" y="564.5" width="200" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend1" value="→ データフロー" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="40" y="594.5" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend2" value="--→ 認証フロー" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#DD344C;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="40" y="619.5" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend3" value="--→ AIアドバイス" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#01A88D;" parent="aws-cloud" vertex="1">
+                    <mxGeometry x="40" y="644.5" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="S3&lt;br&gt;外部食品DB" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="aws-cloud">
+                    <mxGeometry x="860" y="375.5" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="日次総評" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#01A88D;dashed=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="aws-cloud" source="daily-summary" target="bedrock">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="569" y="214.5" as="sourcePoint"/>
+                        <mxPoint x="909" y="225.5" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="860" y="243.5"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="5" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;entryPerimeter=0;curved=1;strokeColor=#01A88D;strokeWidth=2;dashed=1;" edge="1" parent="aws-cloud" source="weekly-report" target="bedrock">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="週次レポート" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="5">
+                    <mxGeometry x="-0.1393" y="12" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="AI" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#01A88D;dashed=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="aws-cloud" target="2">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="899" y="295.5" as="sourcePoint"/>
+                        <mxPoint x="870" y="264.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="features" value="主な機能&#xa;・食事記録（LINE/ブラウザ）&#xa;・カロリー自動計算&#xa;・目標管理&#xa;・AIアドバイス（Claude 3）&#xa;・週次レポート" style="whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="361.5" width="190" height="110" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
